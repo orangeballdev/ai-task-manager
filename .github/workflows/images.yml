@@ -7,8 +7,9 @@ name: Image - build and push to GHCR
 #   ghcr.io/<owner>/ai-task-manager
 #
 # One image serves every service in docker-compose.yml (migrate, app, worker,
-# integrations); they differ only by command. The public installer
-# (site/install.sh) pulls `latest`, so the package should be public.
+# integrations); they differ only by command. docker-compose.yml and the
+# public site's copy of it (what site/install.sh downloads) run `latest`, so
+# the package must stay public for anonymous pulls.
 #
 # It's multi-arch: each platform is built natively on its own runner (amd64 on
 # ubuntu-latest, arm64 on ubuntu-24.04-arm, so Apple Silicon and Graviton
@@ -41,7 +42,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # deploy step commits the new image tag
+  contents: read
   packages: write
 
 concurrency:

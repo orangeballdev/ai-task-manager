@@ -41,7 +41,9 @@ The database, the cloned workspaces and the CLI logins live in Docker volumes, s
 
 The `worker` container mounts `~/.ssh` read-only, so it clones and pushes with your SSH keys. Check that `ssh -T git@github.com` works on the host first. If you use HTTPS remotes, add a Git token in **Settings → Git**.
 
-The prebuilt image runs natively on x86-64 and ARM (including Apple Silicon). To build it from source instead:
+The compose file runs the `latest` image. To update, run the installer again, or run `docker compose pull && docker compose up -d`. To pin one build (or roll back), set `AI_TASK_MANAGER_TAG`, e.g. `AI_TASK_MANAGER_TAG=sha-c998d37 docker compose up -d`.
+
+The prebuilt image runs natively on x86-64 and ARM (including Apple Silicon). A clone of the repo runs the same image with `docker compose up -d`; add `--build` to build it from source instead:
 
 ```bash
 git clone https://github.com/orangeballdev/ai-task-manager.git
