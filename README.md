@@ -1,5 +1,7 @@
 # Claude Task Manager
 
+**Website & docs: [orangeballdev.github.io/ai-task-manager](https://orangeballdev.github.io/ai-task-manager/)**
+
 A self-hosted task queue that runs autonomous coding agents against your Git repositories. You describe a task, and a background worker clones the repo, runs an AI agent (Claude Code, Codex, or an API model), commits the result, pushes a branch and can open a pull request. You then review the logs and the diff from a kanban board.
 
 ## Features
@@ -11,7 +13,7 @@ A self-hosted task queue that runs autonomous coding agents against your Git rep
 - **Teams.** Chain several agents (e.g. Planner → Coder → Reviewer), with optional approval gates between them.
 - **Triggers from anywhere.** Webhooks, a REST API (`/api/v1`), an MCP server for Claude Code/Cursor/VS Code, Slack and inbound email.
 - **Per-repo defaults.** Set the branch, git mode, model, team and concurrency limit for each saved repo.
-- **Built-in docs.** Open `/docs` in the app for the API, MCP and LLM-gateway reference.
+- **Docs.** Guides and the API, MCP and LLM-gateway reference are on the [website](https://orangeballdev.github.io/ai-task-manager/docs/), and in the app at `/docs`.
 
 ---
 
@@ -211,4 +213,4 @@ For a deeper tour of the codebase, see [CLAUDE.md](CLAUDE.md).
 
 ## License
 
-MIT
+[MIT](LICENSE) © 2026 [orangeball.dev](https://orangeball.dev)

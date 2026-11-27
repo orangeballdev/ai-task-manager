@@ -210,8 +210,8 @@ function releaseCompose(): string {
     .replace(/^(#.*\n)+/, "")
     .replace(/^ {4}build: \.\n/gm, "")
     .replace(/^ {4}pull_policy: never\n/gm, "")
-    // The image is built for x86-64 only; this lets Apple Silicon run it under emulation.
-    .replace(/^ {4}image: ai-task-manager:local$/gm, `    image: ${IMAGE}:\${AI_TASK_MANAGER_TAG:-latest}\n    platform: linux/amd64`);
+    // Multi-arch (amd64 + arm64, see images.yml), so Docker picks the host's platform.
+    .replace(/^ {4}image: ai-task-manager:local$/gm, `    image: ${IMAGE}:\${AI_TASK_MANAGER_TAG:-latest}`);
   return [
     `# ${PRODUCT_NAME}: run the published image with Docker Compose.`,
     `#`,
