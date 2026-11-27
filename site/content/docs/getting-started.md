@@ -13,15 +13,23 @@ It runs on the subscriptions you already have. Connect your Claude Pro/Max or Ch
 
 ## Install with Docker
 
-You only need Docker with the Compose plugin.
+You need Docker with the Compose plugin, and Docker running. Then:
 
 ```bash
-git clone https://github.com/orangeballdev/ai-task-manager.git
-cd ai-task-manager
-docker compose up --build -d
+curl -fsSL https://orangeballdev.github.io/ai-task-manager/install.sh | sh
 ```
 
-The first build takes a few minutes. Compose runs the database migrations and starts three containers:
+The installer creates an `ai-task-manager` folder, downloads a [docker-compose.yml](/docker-compose.yml) into it, pulls the prebuilt image and starts the app on http://localhost:3000. If the image can't be pulled, it clones the repo and builds it instead. Run it again to update; your data is kept. For another port, put the variable on the `sh` side: `curl -fsSL …/install.sh | AI_TASK_MANAGER_PORT=8080 sh`. [Read the script](/install.sh) before running it if you prefer.
+
+Or do the same by hand:
+
+```bash
+mkdir ai-task-manager && cd ai-task-manager
+curl -fsSLO https://orangeballdev.github.io/ai-task-manager/docker-compose.yml
+docker compose up -d
+```
+
+Either way, Compose runs the database migrations and starts three containers:
 
 | Container | What it does |
 | --- | --- |
@@ -29,9 +37,17 @@ The first build takes a few minutes. Compose runs the database migrations and st
 | `worker` | Picks up tasks and runs the agents |
 | `integrations` | Slack bot and inbound email (idles if you don't set them up) |
 
-The database, the cloned workspaces and the CLI logins live in Docker volumes, so they survive restarts and rebuilds.
+The database, the cloned workspaces and the CLI logins live in Docker volumes, so they survive restarts and updates. `docker compose logs -f worker` follows the agents' output, and `docker compose down` stops everything (add `-v` to delete the data too).
 
 The `worker` container mounts `~/.ssh` read-only, so it clones and pushes with your SSH keys. Check that `ssh -T git@github.com` works on the host first. If you use HTTPS remotes, add a Git token in **Settings → Git**.
+
+The prebuilt image is x86-64. On Apple Silicon it runs under Docker's emulation; for native speed, build from source:
+
+```bash
+git clone https://github.com/orangeballdev/ai-task-manager.git
+cd ai-task-manager
+docker compose up --build -d
+```
 
 ## First steps
 

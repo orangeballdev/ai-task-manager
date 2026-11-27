@@ -29,7 +29,8 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AWS_REGION: ${AWS_REGION:-}
     ports:
-      - "3000:3000"
+      # AI_TASK_MANAGER_PORT picks another host port (the installer passes it through).
+      - "${AI_TASK_MANAGER_PORT:-3000}:3000"
     volumes:
       - workspaces:/workspaces
       - db_data:/data

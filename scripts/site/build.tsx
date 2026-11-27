@@ -23,7 +23,8 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Home } from "./home";
 import { Layout } from "./layout";
-import { PRODUCT_NAME, SITE_DESCRIPTION } from "./site-config";
+import { GITHUB_URL, IMAGE, PRODUCT_NAME, SITE_DESCRIPTION } from "./site-config";
+import { PUBLIC_SITE_URL } from "../../src/lib/public-site";
 
 const ROOT = path.resolve(__dirname, "../..");
 const SITE = path.join(ROOT, "site");
@@ -193,6 +194,43 @@ function DocsPageView({ page, pages, prefix }: { page: DocPage; pages: DocPage[]
 
 // ---------- build ----------
 
+/**
+ * The docker-compose.yml the installer downloads: the repo's own compose file, switched
+ * from building `ai-task-manager:local` to pulling the published image. Derived rather than
+ * kept as a second copy, so the two can't drift; fails loudly if the source changes shape.
+ */
+function releaseCompose(): string {
+  const src = fs.readFileSync(path.join(ROOT, "docker-compose.yml"), "utf8");
+  const count = (re: RegExp) => (src.match(re) ?? []).length;
+  const services = count(/^ {4}image: ai-task-manager:local$/gm);
+  if (services < 2 || count(/^ {4}build: \.$/gm) !== 1 || count(/^ {4}pull_policy: never$/gm) !== services - 1) {
+    throw new Error("docker-compose.yml no longer matches what releaseCompose() expects; update it in scripts/site/build.tsx");
+  }
+  const body = src
+    .replace(/^(#.*\n)+/, "")
+    .replace(/^ {4}build: \.\n/gm, "")
+    .replace(/^ {4}pull_policy: never\n/gm, "")
+    // The image is built for x86-64 only; this lets Apple Silicon run it under emulation.
+    .replace(/^ {4}image: ai-task-manager:local$/gm, `    image: ${IMAGE}:\${AI_TASK_MANAGER_TAG:-latest}\n    platform: linux/amd64`);
+  return [
+    `# ${PRODUCT_NAME}: run the published image with Docker Compose.`,
+    `#`,
+    `#   docker compose up -d          # then open http://localhost:3000`,
+    `#`,
+    `# Or let the installer do it: curl -fsSL ${PUBLIC_SITE_URL}/install.sh | sh`,
+    `# Generated from ${GITHUB_URL}/blob/main/docker-compose.yml by scripts/site/build.tsx.`,
+    `# Env: AI_TASK_MANAGER_PORT (default 3000), AI_TASK_MANAGER_TAG (default latest).`,
+    body,
+  ].join("\n");
+}
+
+function installScript(): string {
+  return fs
+    .readFileSync(path.join(SITE, "install.sh"), "utf8")
+    .replace(/__SITE_URL__/g, PUBLIC_SITE_URL)
+    .replace(/__REPO_URL__/g, `${GITHUB_URL}.git`);
+}
+
 function write(outPath: string, element: ReactNode) {
   const file = path.join(DIST, outPath);
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -214,6 +252,8 @@ async function main() {
   copyDir(path.join(SITE, "public"), DIST);
   fs.copyFileSync(path.join(ROOT, "src/app/icon.svg"), path.join(DIST, "icon.svg"));
   fs.writeFileSync(path.join(DIST, ".nojekyll"), "");
+  fs.writeFileSync(path.join(DIST, "docker-compose.yml"), releaseCompose());
+  fs.writeFileSync(path.join(DIST, "install.sh"), installScript(), { mode: 0o755 });
 
   const guide = (file: string, slug: string): DocPage => {
     const g = readGuide(file);

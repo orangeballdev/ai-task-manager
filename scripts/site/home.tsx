@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { Layout } from "./layout";
 import { GITHUB_URL, PRODUCT_NAME, SITE_DESCRIPTION } from "./site-config";
+import { PUBLIC_SITE_URL } from "../../src/lib/public-site";
 
 function Shot({ prefix, name, alt, className }: { prefix: string; name: string; alt: string; className?: string }) {
   const src = `${prefix}screenshots/${name}.png`;
@@ -52,10 +53,7 @@ client.chat.completions.create(
     messages=[{"role": "user", "content": "Review this diff"}],
 )`;
 
-const INSTALL_SNIPPET = `git clone ${GITHUB_URL}.git
-cd ai-task-manager
-docker compose up --build -d
-# open http://localhost:3000`;
+const INSTALL_SNIPPET = `curl -fsSL ${PUBLIC_SITE_URL}/install.sh | sh`;
 
 const MORE = [
   { title: "Kanban board & live logs", body: "Watch agents work in real time, message them mid-task, then approve the result or request changes." },
@@ -219,14 +217,20 @@ export function Home({ prefix }: { prefix: string }) {
           <div>
             <h2>Running in two minutes</h2>
             <p>
-              One <code>docker compose up</code> starts the web app, the worker and the integrations. Sign in to a subscription from Settings,
-              add a repo, and queue your first task.
+              One command, with Docker running: it downloads the compose file, starts the web app, the worker and the integrations on{" "}
+              <code>localhost:3000</code>. Then sign in to a subscription from Settings, add a repo, and queue your first task.
             </p>
             <a className="button primary" href={`${prefix}docs/`}>Read the guide</a>
           </div>
-          <pre>
-            <code>{INSTALL_SNIPPET}</code>
-          </pre>
+          <div className="install-cmd">
+            <pre>
+              <code>{INSTALL_SNIPPET}</code>
+            </pre>
+            <p className="install-alt">
+              Rather not pipe to a shell? Download <a href={`${prefix}docker-compose.yml`} download>docker-compose.yml</a> and run{" "}
+              <code>docker compose up -d</code>, or read <a href={`${prefix}install.sh`}>the script</a> first.
+            </p>
+          </div>
         </section>
       </main>
     </Layout>

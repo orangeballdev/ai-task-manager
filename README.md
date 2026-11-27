@@ -17,7 +17,13 @@ A self-hosted task queue that runs autonomous coding agents against your Git rep
 
 ## Quick start (Docker, recommended)
 
-This is the easiest way to run it. You only need **Docker** with the Compose plugin.
+This is the easiest way to run it. You only need **Docker** with the Compose plugin. One command downloads the compose file and starts the prebuilt image:
+
+```bash
+curl -fsSL https://orangeballdev.github.io/ai-task-manager/install.sh | sh
+```
+
+It installs into `./ai-task-manager`, falls back to building from source if the image can't be pulled, and updates in place when you run it again. Or build from a clone:
 
 ```bash
 git clone git@github.com:orangeballdev/ai-task-manager.git

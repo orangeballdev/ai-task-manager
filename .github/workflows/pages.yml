@@ -18,6 +18,7 @@ on:
       - "src/lib/docs-content/**"
       - "src/lib/mcp/tools.ts"
       - "src/app/icon.svg"
+      - "docker-compose.yml"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
