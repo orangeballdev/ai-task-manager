@@ -72,7 +72,7 @@ export function Home({ prefix, analytics }: { prefix: string; analytics: boolean
     <Layout title={`${PRODUCT_NAME}: coding agents on the subscriptions you already have`} description={SITE_DESCRIPTION} prefix={prefix} path="" active="home" jsonLd={homeJsonLd()} analytics={analytics}>
       <main>
         <section className="hero">
-          <p className="pill">Self-hosted · Claude Code · Codex · MIT</p>
+          <p className="pill">Self-hosted</p>
           <h1>
             Put your Claude and ChatGPT subscriptions <span className="accent">to work</span>.
           </h1>
