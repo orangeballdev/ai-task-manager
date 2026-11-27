@@ -1,25 +1,33 @@
 "use client";
 import { useState } from "react";
-import Link from "next/link";
-import { Bot, X } from "lucide-react";
+import { BookOpen, Bot, Bug, ExternalLink, Globe, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { BuildInfo } from "@/lib/build-info";
+import { GITHUB_URL, PUBLIC_DOCS_URL, PUBLIC_SITE_URL } from "@/lib/public-site";
 
-export function AboutButton({ buildTime }: { buildTime?: string | null }) {
+const LINKS = [
+  { href: PUBLIC_DOCS_URL, label: "Documentation", icon: BookOpen },
+  { href: PUBLIC_SITE_URL, label: "Website", icon: Globe },
+  { href: GITHUB_URL, label: "GitHub", icon: ExternalLink },
+  { href: `${GITHUB_URL}/issues`, label: "Report an issue", icon: Bug },
+];
+
+export function AboutButton({ buildInfo }: { buildInfo: BuildInfo }) {
   const [open, setOpen] = useState(false);
 
+  const { buildTime, version, commit } = buildInfo;
   const formattedBuildTime = buildTime
-    ? new Date(buildTime).toLocaleString(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })
+    ? new Date(buildTime).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
     : null;
+  // A published image shows its tag (sha-xxxxxxx); a local build shows its commit if known.
+  const versionLabel = version ?? (commit ? `local build (${commit.slice(0, 7)})` : "local build");
 
   return (
     <>
       <button
         onClick={() => setOpen(true)}
         className="w-6 h-6 rounded-full border border-muted-foreground/40 text-muted-foreground hover:text-foreground hover:border-foreground transition-colors text-xs flex items-center justify-center"
-        aria-label="About"
+        aria-label="Help and version"
       >
         ?
       </button>
@@ -43,50 +51,63 @@ export function AboutButton({ buildTime }: { buildTime?: string | null }) {
 
             <div className="flex items-center gap-3 mb-4 pr-8">
               <Bot size={28} className="shrink-0" style={{ color: "#E8865A" }} />
-              <h2 className="text-lg font-semibold">Claude Task Manager</h2>
+              <h2 className="text-lg font-semibold">AI Task Manager</h2>
             </div>
 
             <div className="flex flex-col gap-3 text-sm text-muted-foreground leading-relaxed">
               <p>
-                This app lets you queue up coding tasks and have Claude work on them automatically, one at a time, in the background.
+                Queue coding tasks and let AI agents work through them in the background. Point a task at one or more
+                Git repos: the agent clones them, makes the changes, and pushes a branch or opens a pull request for you to review.
               </p>
               <p>
-                You describe what you want done, point it at a Git repo, and the agent clones the repo, makes the changes, and opens a pull request.
+                Agents run on your <strong className="text-foreground">Claude or ChatGPT subscription</strong> (Claude Code or
+                Codex CLI) or an <strong className="text-foreground">API key</strong>, set up in Settings → AI. Run a single
+                agent per task, or a <strong className="text-foreground">team</strong> that hands the work from one stage to the next.
               </p>
-              <p>
-                You can use your <strong className="text-foreground">Claude subscription</strong> (via the CLI) or your own <strong className="text-foreground">Anthropic API key</strong>, configure either in Settings.
-              </p>
-              <p>
-                Tasks run one at a time. You can watch the live output, reorder the queue, and retry failed tasks.
-              </p>
-              <div className="border-t border-border pt-3 flex flex-col gap-2">
-                <p className="font-medium text-foreground">Designed to keep token usage low</p>
-                <ul className="flex flex-col gap-1.5 list-none">
-                  <li>→ Each task runs in a <strong className="text-foreground">fresh, isolated context</strong>, no conversation history bleeding in</li>
-                  <li>→ Repo-level <strong className="text-foreground">CLAUDE.md files</strong> are loaded automatically, so standing context lives in the repo, not the prompt</li>
-                  <li>→ Tasks are <strong className="text-foreground">scoped to specific repos</strong>, so Claude never explores code it doesn&apos;t need</li>
-                </ul>
+
+              <div className="border-t border-border pt-3 grid grid-cols-2 gap-2">
+                {LINKS.map(({ href, label, icon: Icon }) => (
+                  <a
+                    key={href}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-foreground hover:bg-muted transition-colors"
+                  >
+                    <Icon size={14} className="shrink-0 text-muted-foreground" />
+                    {label}
+                  </a>
+                ))}
               </div>
-              <div className="border-t border-border pt-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => setOpen(false)}
-                  render={<Link href="/setup" />}
-                >
-                  Setup Guide
-                </Button>
-              </div>
-              {formattedBuildTime && (
-                <p className="border-t border-border pt-3 text-xs text-muted-foreground/70">
-                  Last deployed: {formattedBuildTime}
-                </p>
-              )}
+
+              <dl className="border-t border-border pt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs text-muted-foreground/80">
+                <dt>Version</dt>
+                <dd className="font-mono text-foreground/90">
+                  {commit ? (
+                    <a
+                      href={`${GITHUB_URL}/commit/${commit}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline"
+                      title="View this commit on GitHub"
+                    >
+                      {versionLabel}
+                    </a>
+                  ) : (
+                    versionLabel
+                  )}
+                </dd>
+                {formattedBuildTime && (
+                  <>
+                    <dt>Built</dt>
+                    <dd>{formattedBuildTime}</dd>
+                  </>
+                )}
+              </dl>
             </div>
 
             <Button className="mt-5 w-full" onClick={() => setOpen(false)}>
-              Got it
+              Close
             </Button>
           </div>
         </div>
