@@ -17,6 +17,7 @@ on:
       - "scripts/site/**"
       - "src/lib/docs-content/**"
       - "src/lib/mcp/tools.ts"
+      - "src/lib/public-site.ts"
       - "src/app/icon.svg"
       - "docker-compose.yml"
       - "LICENSE"

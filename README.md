@@ -1,6 +1,6 @@
 # Claude Task Manager
 
-**Website & docs: [orangeballdev.github.io/ai-task-manager](https://orangeballdev.github.io/ai-task-manager/)**
+**Website & docs: [aitaskmanager.orangeball.dev](https://aitaskmanager.orangeball.dev/)**
 
 A self-hosted task queue that runs autonomous coding agents against your Git repositories. You describe a task, and a background worker clones the repo, runs an AI agent (Claude Code, Codex, or an API model), commits the result, pushes a branch and can open a pull request. You then review the logs and the diff from a kanban board.
 
@@ -13,7 +13,7 @@ A self-hosted task queue that runs autonomous coding agents against your Git rep
 - **Teams.** Chain several agents (e.g. Planner → Coder → Reviewer), with optional approval gates between them.
 - **Triggers from anywhere.** Webhooks, a REST API (`/api/v1`), an MCP server for Claude Code/Cursor/VS Code, Slack and inbound email.
 - **Per-repo defaults.** Set the branch, git mode, model, team and concurrency limit for each saved repo.
-- **Docs.** Guides and the API, MCP and LLM-gateway reference are on the [website](https://orangeballdev.github.io/ai-task-manager/docs/), and in the app at `/docs`.
+- **Docs.** Guides and the API, MCP and LLM-gateway reference are on the [website](https://aitaskmanager.orangeball.dev/docs/), and in the app at `/docs`.
 
 ---
 
@@ -22,7 +22,7 @@ A self-hosted task queue that runs autonomous coding agents against your Git rep
 This is the easiest way to run it. You only need **Docker** with the Compose plugin. One command downloads the compose file and starts the prebuilt image:
 
 ```bash
-curl -fsSL https://orangeballdev.github.io/ai-task-manager/install.sh | sh
+curl -fsSL https://aitaskmanager.orangeball.dev/install.sh | sh
 ```
 
 It installs into `./ai-task-manager`, falls back to building from source if the image can't be pulled, and updates in place when you run it again. Or build from a clone:

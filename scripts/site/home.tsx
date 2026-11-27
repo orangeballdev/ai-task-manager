@@ -1,15 +1,16 @@
-/* eslint-disable @next/next/no-img-element -- static HTML generator, not a Next.js page */
 // The marketing page (site/dist/index.html). Screenshots come from `npm run demo:screenshots`.
 import type { ReactNode } from "react";
+import { Picture } from "./images";
 import { Layout } from "./layout";
+import { homeJsonLd } from "./seo";
 import { GITHUB_URL, PRODUCT_NAME, SITE_DESCRIPTION } from "./site-config";
 import { PUBLIC_SITE_URL } from "../../src/lib/public-site";
 
-function Shot({ prefix, name, alt, className }: { prefix: string; name: string; alt: string; className?: string }) {
-  const src = `${prefix}screenshots/${name}.png`;
+function Shot({ prefix, name, alt, className, eager }: { prefix: string; name: string; alt: string; className?: string; eager?: boolean }) {
+  const rootPath = `screenshots/${name}.png`;
   return (
-    <a className={`shot ${className ?? ""}`} href={src} target="_blank" rel="noopener noreferrer">
-      <img src={src} alt={alt} loading="lazy" />
+    <a className={`shot ${className ?? ""}`} href={prefix + rootPath} target="_blank" rel="noopener noreferrer">
+      <Picture rootPath={rootPath} prefix={prefix} alt={alt} eager={eager} />
     </a>
   );
 }
@@ -53,7 +54,7 @@ client.chat.completions.create(
     messages=[{"role": "user", "content": "Review this diff"}],
 )`;
 
-const INSTALL_SNIPPET = `curl -fsSL ${PUBLIC_SITE_URL}/install.sh | sh`;
+export const INSTALL_SNIPPET = `curl -fsSL ${PUBLIC_SITE_URL}/install.sh | sh`;
 
 const MORE = [
   { title: "Kanban board & live logs", body: "Watch agents work in real time, message them mid-task, then approve the result or request changes." },
@@ -66,9 +67,9 @@ const MORE = [
   { title: "OpenTelemetry", body: "Traces, metrics and logs with GenAI conventions: every agent run, tool call and proxy request." },
 ];
 
-export function Home({ prefix }: { prefix: string }) {
+export function Home({ prefix, analytics }: { prefix: string; analytics: boolean }) {
   return (
-    <Layout title={`${PRODUCT_NAME}: coding agents on the subscriptions you already have`} description={SITE_DESCRIPTION} prefix={prefix} active="home">
+    <Layout title={`${PRODUCT_NAME}: coding agents on the subscriptions you already have`} description={SITE_DESCRIPTION} prefix={prefix} path="" active="home" jsonLd={homeJsonLd()} analytics={analytics}>
       <main>
         <section className="hero">
           <p className="pill">Self-hosted · Claude Code · Codex · MIT</p>
@@ -83,7 +84,7 @@ export function Home({ prefix }: { prefix: string }) {
             <a className="button primary" href={`${prefix}docs/`}>Get started</a>
             <a className="button" href={GITHUB_URL} target="_blank" rel="noopener noreferrer">View on GitHub</a>
           </div>
-          <Shot prefix={prefix} name="board" alt="The task board: tasks moving from To Do through In Progress and In Review to Done" className="hero-shot" />
+          <Shot prefix={prefix} name="board" alt="The task board: tasks moving from To Do through In Progress and In Review to Done" className="hero-shot" eager />
         </section>
 
         <section className="strip" aria-label="Works with">

@@ -9,11 +9,16 @@
 //   site/content/docs/*.md        hand-written guides (front matter: title, description)
 //   src/lib/docs-content/*        the in-app /docs reference pages (REST API, API proxy, MCP),
 //                                 rendered here too so the two never drift apart
-//   site/public/                  copied as-is (styles, screenshots from `npm run demo:screenshots`)
+//   site/public/                  copied as-is (styles, screenshots from `npm run demo:screenshots`);
+//                                 each screenshot also gets a lossless .webp copy
+//
+// Alongside the HTML it writes sitemap.xml, robots.txt, llms.txt / llms-full.txt and a
+// markdown copy of every docs page (docs/<slug>.md) for LLM tools; see seo.ts.
 //
 // Every link is written relative to the page, so the site works under a project path
 // (orangeballdev.github.io/ai-task-manager/) as well as at a domain root. In markdown,
 // write site links as root paths (`/docs/teams`, `/screenshots/board.png`); they're rewritten.
+import { build as esbuild } from "esbuild";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -21,9 +26,11 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Home } from "./home";
+import { Home, INSTALL_SNIPPET } from "./home";
+import { Picture, prepareImages } from "./images";
 import { Layout } from "./layout";
-import { GITHUB_URL, IMAGE, PRODUCT_NAME, SITE_DESCRIPTION } from "./site-config";
+import { absoluteUrl, docJsonLd, llmsTxt, robotsTxt, sitemapXml } from "./seo";
+import { GITHUB_URL, IMAGE, PRODUCT_NAME, SITE_ANALYTICS, SITE_DESCRIPTION } from "./site-config";
 import { PUBLIC_SITE_URL } from "../../src/lib/public-site";
 
 const ROOT = path.resolve(__dirname, "../..");
@@ -138,10 +145,11 @@ function MarkdownBody({ markdown, prefix }: { markdown: string; prefix: string }
           );
         },
         img: ({ src, alt }) => {
-          const url = relLink(String(src ?? ""), prefix);
+          const raw = String(src ?? "");
+          const url = relLink(raw, prefix);
           return (
             <a className="shot" href={url} target="_blank" rel="noopener noreferrer">
-              <img src={url} alt={alt ?? ""} loading="lazy" />
+              {raw.startsWith("/") ? <Picture rootPath={raw} prefix={prefix} alt={alt ?? ""} /> : <img src={url} alt={alt ?? ""} loading="lazy" />}
             </a>
           );
         },
@@ -193,6 +201,42 @@ function DocsPageView({ page, pages, prefix }: { page: DocPage; pages: DocPage[]
 }
 
 // ---------- build ----------
+
+/**
+ * Bundles the ObiStack analytics SDK into analytics/analytics.js. An ES-module build with
+ * code splitting, so the session-replay recorder (~220 KB, a dynamic import in the SDK)
+ * stays a separate chunk fetched only when recording starts. Returns false when analytics is off.
+ */
+async function buildAnalytics(): Promise<boolean> {
+  if (!SITE_ANALYTICS.key) return false;
+  await esbuild({
+    entryPoints: [path.join(__dirname, "analytics-entry.ts")],
+    outdir: path.join(DIST, "analytics"),
+    entryNames: "analytics",
+    chunkNames: "chunk-[hash]",
+    bundle: true,
+    splitting: true,
+    minify: true,
+    format: "esm",
+    target: "es2020",
+    define: { __SITE_ANALYTICS__: JSON.stringify(SITE_ANALYTICS) },
+    logLevel: "warning",
+  });
+  return true;
+}
+
+/** Where a docs page lives, relative to the site root: its HTML URL and its markdown copy. */
+function docPaths(slug: string): { rootPath: string; mdPath: string } {
+  return slug ? { rootPath: `docs/${slug}/`, mdPath: `docs/${slug}.md` } : { rootPath: "docs/", mdPath: "docs/index.md" };
+}
+
+/** Markdown for the .md copies and llms-full.txt: root-relative site links → absolute URLs. */
+function absoluteMarkdown(markdown: string): string {
+  return markdown.replace(/\]\((\/[^)\s]*)\)/g, (_m, href: string) => {
+    const rel = relLink(href, "");
+    return `](${absoluteUrl(rel === "./" ? "" : rel)})`;
+  });
+}
 
 /**
  * The docker-compose.yml the installer downloads: the repo's own compose file, switched
@@ -254,6 +298,8 @@ async function main() {
   fs.writeFileSync(path.join(DIST, ".nojekyll"), "");
   fs.writeFileSync(path.join(DIST, "docker-compose.yml"), releaseCompose());
   fs.writeFileSync(path.join(DIST, "install.sh"), installScript(), { mode: 0o755 });
+  await prepareImages(DIST);
+  const analytics = await buildAnalytics();
 
   const guide = (file: string, slug: string): DocPage => {
     const g = readGuide(file);
@@ -279,17 +325,47 @@ async function main() {
     }
   }
 
-  write("index.html", <Home prefix="" />);
+  write("index.html", <Home prefix="" analytics={analytics} />);
   for (const page of pages) {
-    const out = page.slug ? `docs/${page.slug}/index.html` : "docs/index.html";
+    const { rootPath, mdPath } = docPaths(page.slug);
+    const out = `${rootPath}index.html`;
     const prefix = prefixFor(out);
+    const description = page.description || SITE_DESCRIPTION;
     write(
       out,
-      <Layout title={`${page.title} · ${PRODUCT_NAME}`} description={page.description || SITE_DESCRIPTION} prefix={prefix} active="docs">
+      <Layout
+        title={`${page.title} · ${PRODUCT_NAME}`}
+        description={description}
+        prefix={prefix}
+        path={rootPath}
+        active="docs"
+        jsonLd={docJsonLd({ title: page.title, description, rootPath })}
+        markdownPath={mdPath}
+        analytics={analytics}
+      >
         <DocsPageView page={page} pages={pages} prefix={prefix} />
       </Layout>,
     );
+    fs.writeFileSync(path.join(DIST, mdPath), absoluteMarkdown(page.markdown).trim() + "\n");
   }
+
+  // For search engines and LLM tools.
+  fs.writeFileSync(path.join(DIST, "sitemap.xml"), sitemapXml(["", ...pages.map((p) => docPaths(p.slug).rootPath)]));
+  fs.writeFileSync(path.join(DIST, "robots.txt"), robotsTxt());
+  fs.writeFileSync(
+    path.join(DIST, "llms.txt"),
+    llmsTxt(
+      pages.map((p) => ({ title: p.title, description: p.description, mdPath: docPaths(p.slug).mdPath, group: p.group })),
+      INSTALL_SNIPPET,
+    ),
+  );
+  fs.writeFileSync(
+    path.join(DIST, "llms-full.txt"),
+    [
+      `# ${PRODUCT_NAME}\n\n> ${SITE_DESCRIPTION}\n\nSource: ${GITHUB_URL}`,
+      ...pages.map((p) => `<!-- ${absoluteUrl(docPaths(p.slug).rootPath)} -->\n\n${absoluteMarkdown(p.markdown).trim()}`),
+    ].join("\n\n---\n\n") + "\n",
+  );
   console.log(`Built ${pages.length + 1} pages into ${path.relative(ROOT, DIST)}/`);
   process.exit(0); // the Prisma client imported for the MCP tool list keeps the loop alive
 }

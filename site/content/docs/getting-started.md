@@ -16,7 +16,7 @@ It runs on the subscriptions you already have. Connect your Claude Pro/Max or Ch
 You need Docker with the Compose plugin, and Docker running. Then:
 
 ```bash
-curl -fsSL https://orangeballdev.github.io/ai-task-manager/install.sh | sh
+curl -fsSL https://aitaskmanager.orangeball.dev/install.sh | sh
 ```
 
 The installer creates an `ai-task-manager` folder, downloads a [docker-compose.yml](/docker-compose.yml) into it, pulls the prebuilt image and starts the app on http://localhost:3000. If the image can't be pulled, it clones the repo and builds it instead. Run it again to update; your data is kept. For another port, put the variable on the `sh` side: `curl -fsSL …/install.sh | AI_TASK_MANAGER_PORT=8080 sh`. [Read the script](/install.sh) before running it if you prefer.
@@ -25,7 +25,7 @@ Or do the same by hand:
 
 ```bash
 mkdir ai-task-manager && cd ai-task-manager
-curl -fsSLO https://orangeballdev.github.io/ai-task-manager/docker-compose.yml
+curl -fsSLO https://aitaskmanager.orangeball.dev/docker-compose.yml
 docker compose up -d
 ```
 
