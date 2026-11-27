@@ -2,11 +2,10 @@ import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
-import { readFileSync } from "fs";
-import { join } from "path";
 import { Settings } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { AboutButton } from "@/components/AboutModal";
+import { getBuildInfo } from "@/lib/build-info";
 import { MobileNav } from "@/components/MobileNav";
 import { HealthIndicator } from "@/components/HealthIndicator";
 import { NavSearch } from "@/components/NavSearch";
@@ -68,15 +67,6 @@ export const metadata: Metadata = {
   },
 };
 
-function getBuildTime(): string | null {
-  try {
-    const raw = readFileSync(join(process.cwd(), "src/generated/build-info.json"), "utf-8");
-    return JSON.parse(raw).buildTime ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await getCurrentSession();
   if (!session && (await authRequired())) {
@@ -94,7 +84,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     );
   }
 
-  const buildTime = getBuildTime();
+  const buildInfo = getBuildInfo();
   const homePageSetting = await prisma.setting.findUnique({ where: { key: "home_page" } });
   const rawHomePage = homePageSetting?.value;
   const homePage = !rawHomePage || rawHomePage === "/" ? "/tasks" : rawHomePage;
@@ -122,7 +112,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <div className="ml-auto flex items-center gap-3 sm:gap-4 shrink-0">
               <NavSearch />
               <HealthIndicator />
-              <AboutButton buildTime={buildTime} />
+              <AboutButton buildInfo={buildInfo} />
               <Link href="/settings" className="hover:text-foreground transition-colors" aria-label="Settings"><Settings size={20} /></Link>
               {session ? (
                 <UserMenu email={session.user.email} name={session.user.name} />

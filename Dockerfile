@@ -46,6 +46,12 @@ COPY --chown=appuser:appuser . .
 # appuser: otherwise the mount creates it owned by root and the build can't write to it.
 RUN mkdir -p .next
 #
+# Shown as the version in the app's help (?) modal; images.yml passes the image's
+# sha- tag and the full commit. Declared here, after the dependency layers, so a
+# new value only rebuilds from this point. Empty for a local `--build`.
+ARG APP_VERSION=
+ARG GIT_COMMIT=
+#
 # Prerendering some pages (e.g. /docs/api) reads Settings, so the build gets a
 # throwaway database. It isn't kept: the containers use /data. `db push` creates
 # the current schema in one step, and /dev/shm keeps it in memory. Replaying
