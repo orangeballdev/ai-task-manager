@@ -1,0 +1,92 @@
+name: LogSaaS scan
+
+on:
+  push:
+    branches: [main]
+    # Skipped for chart and deploy-only pushes, like images.yml.
+    paths-ignore:
+      - "charts/**"
+      - "deploy/**"
+  # Run by hand: Actions -> Run workflow, or `gh workflow run logsaas.yml`.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trivy:
+    runs-on: ubuntu-latest
+    env:
+      LOGS_SAAS_URL: https://ingest.obistack.com
+      LOGS_SAAS_CODE_KEY: ${{ secrets.LOGS_SAAS_CODE_KEY }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+    steps:
+      - name: Report build start to Logs SaaS
+        run: |
+          curl -sS "$LOGS_SAAS_URL/ingest/ci/builds" \
+            -H "Authorization: Bearer $LOGS_SAAS_CODE_KEY" \
+            -H "Content-Type: application/json" \
+            --data-binary @- <<JSON || true
+          {
+            "repository": "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY",
+            "provider": "github",
+            "run_id": "$GITHUB_RUN_ID",
+            "attempt": "$GITHUB_RUN_ATTEMPT",
+            "status": "running",
+            "branch": "${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}",
+            "default_branch": "$DEFAULT_BRANCH",
+            "commit": "$GITHUB_SHA",
+            "url": "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          }
+          JSON
+
+      - uses: actions/checkout@v4
+
+      - name: Install Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sudo sh -s -- -b /usr/local/bin
+
+      - name: Trivy
+        run: |
+          trivy fs --format json --output trivy.json \
+            --scanners vuln,secret,misconfig,license .
+          trivy fs --format cyclonedx --output sbom.cdx.json .
+
+      - name: Report to Logs SaaS
+        if: always()
+        env:
+          BUILD_STATUS: ${{ job.status }}
+        run: |
+          curl -sS "$LOGS_SAAS_URL/ingest/ci/builds" \
+            -H "Authorization: Bearer $LOGS_SAAS_CODE_KEY" \
+            -H "Content-Type: application/json" \
+            --data-binary @- <<JSON || true
+          {
+            "repository": "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY",
+            "provider": "github",
+            "run_id": "$GITHUB_RUN_ID",
+            "attempt": "$GITHUB_RUN_ATTEMPT",
+            "status": "$BUILD_STATUS",
+            "branch": "${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}",
+            "default_branch": "$DEFAULT_BRANCH",
+            "commit": "$GITHUB_SHA",
+            "url": "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          }
+          JSON
+
+          upload() {
+            [ -f "$2" ] || return 0
+            gzip -c "$2" | curl -sS "$LOGS_SAAS_URL/ingest/ci/$1" \
+              -H "Authorization: Bearer $LOGS_SAAS_CODE_KEY" \
+              -H "Content-Type: application/json" \
+              -H "Content-Encoding: gzip" \
+              -H "X-Code-Repository: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+              -H "X-Code-Provider: github" \
+              -H "X-Code-Branch: ${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}" \
+              -H "X-Code-Default-Branch: $DEFAULT_BRANCH" \
+              -H "X-Code-Commit: $GITHUB_SHA" \
+              --data-binary @- || true
+          }
+          upload trivy trivy.json
+          upload sbom sbom.cdx.json

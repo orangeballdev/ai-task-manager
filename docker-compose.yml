@@ -1,0 +1,87 @@
+# One image serves every service. Only `migrate` builds it, and the others
+# reuse the tag. Giving each service its own `build: .` built the same image
+# four times per rebuild.
+services:
+  migrate:
+    build: .
+    image: ai-task-manager:local
+    command: npx prisma migrate deploy
+    environment:
+      DATABASE_URL: file:/data/dev.db
+    volumes:
+      - db_data:/data
+    restart: "no"
+
+  app:
+    image: ai-task-manager:local
+    pull_policy: never
+    command: node .next/standalone/server.js
+    environment:
+      DATABASE_URL: file:/data/dev.db
+      WORKSPACES_PATH: /workspaces
+      # Pasted/attached images: must be on a volume the app (which stores uploads)
+      # and the worker (which copies them into task workspaces) both mount.
+      ATTACHMENTS_PATH: /data/attachments
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_REGION: ${AWS_REGION:-}
+    ports:
+      - "3000:3000"
+    volumes:
+      - workspaces:/workspaces
+      - db_data:/data
+      - claude_home:/home/appuser/.claude
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  worker:
+    image: ai-task-manager:local
+    pull_policy: never
+    command: npx tsx src/worker/index.ts
+    # Reap orphaned git/esbuild children; npm as PID 1 leaves them as zombies.
+    init: true
+    environment:
+      DATABASE_URL: file:/data/dev.db
+      WORKSPACES_PATH: /workspaces
+      # Pasted/attached images: must be on a volume the app (which stores uploads)
+      # and the worker (which copies them into task workspaces) both mount.
+      ATTACHMENTS_PATH: /data/attachments
+      NODE_ENV: production
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_REGION: ${AWS_REGION:-}
+
+    volumes:
+      - workspaces:/workspaces
+      - db_data:/data
+      - claude_home:/home/appuser/.claude
+      # Mount SSH keys so the worker can clone private repos
+      - ~/.ssh:/home/appuser/.ssh:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  integrations:
+    image: ai-task-manager:local
+    pull_policy: never
+    command: npx tsx src/integrations/index.ts
+    environment:
+      DATABASE_URL: file:/data/dev.db
+      NODE_ENV: production
+    volumes:
+      - db_data:/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  workspaces:
+  db_data:
+  claude_home:

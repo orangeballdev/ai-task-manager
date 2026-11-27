@@ -1,0 +1,21 @@
+# Values for the VPS cluster, read by the Argo CD Application in
+# deploy/argocd/ai-task-manager.yaml.
+#
+# image.tag is bumped by .github/workflows/images.yml after each build on
+# main (commit "Deploy sha-…"), and Argo CD rolls it out on its next sync.
+# To roll back, set it to an older sha-<short sha> tag that is still in GHCR
+# (only the three newest are kept).
+image:
+  tag: sha-60e6c45
+imagePullSecrets:
+  - name: ghcr-pull
+# No Slack / inbound email on this cluster.
+integrations:
+  enabled: false
+# The app also serves the LLM gateway (/api/llm), which spawns one
+# `claude`/`codex` CLI per request on subscription providers (~250Mi
+# each), so it needs far more headroom than the UI alone.
+app:
+  resources:
+    requests: { cpu: 50m, memory: 256Mi }
+    limits: { memory: 1Gi }

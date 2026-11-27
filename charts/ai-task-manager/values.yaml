@@ -1,0 +1,96 @@
+# Image built by .github/workflows/images.yml on every merge to main.
+# Pin a commit: --set image.tag=sha-<short sha>. GHCR keeps only the three
+# newest versions, so a tag older than that can no longer be pulled.
+image:
+  repository: ghcr.io/orangeballdev/ai-task-manager
+  tag: ""            # required, e.g. sha-77e2cbe
+  pullPolicy: IfNotPresent
+
+# The GHCR package is private. Either name an existing docker-registry
+# secret in imagePullSecrets, or set imageCredentials and the chart creates
+# one (use a token with only read:packages).
+imagePullSecrets: []
+#  - name: ghcr-pull
+imageCredentials:
+  registry: ghcr.io
+  username: ""
+  password: ""
+
+# Plain (non-secret) environment for every container.
+env: {}
+#  APP_URL: https://tasks.example.com
+#  AWS_REGION: us-east-1
+
+# Secret environment for every container (SLACK_BOT_TOKEN, SLACK_APP_TOKEN,
+# AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, ...).
+# Prefer existingSecret so values never sit in a values file.
+existingSecret: ""
+secretEnv: {}
+
+# Optional SSH key for cloning private repos over SSH. Name a secret holding
+# e.g. `id_ed25519` and `known_hosts`; it is copied into ~/.ssh with the
+# 0600 permissions ssh insists on. Not needed if repos use a Git token.
+ssh:
+  existingSecret: ""
+
+# One volume holds everything (SQLite DB + attachments, cloned task
+# workspaces, the Claude CLI login), as subPaths. ReadWriteOnce is enough
+# because all three processes share one pod.
+persistence:
+  existingClaim: ""
+  storageClass: ""   # "" = cluster default
+  accessMode: ReadWriteOnce
+  size: 10Gi
+
+# Resources are deliberately small. No CPU limits: on a small node they only
+# cause throttling; requests still decide scheduling. Memory limits stop a
+# runaway agent build from taking the node down.
+app:
+  # Caps the V8 heap below the memory limit so Node collects before OOM.
+  nodeOptions: --max-old-space-size=320
+  resources:
+    requests: { cpu: 50m, memory: 192Mi }
+    limits: { memory: 448Mi }
+
+worker:
+  # The worker runs the agents (claude / codex CLIs) and whatever builds and
+  # test suites they start, all inside this container. This limit is the
+  # real budget for task runs: keep Settings -> concurrent tasks at 1 on a
+  # small cluster, and raise this if agents get OOM-killed.
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits: { memory: 2Gi }
+
+integrations:
+  # Slack / inbound email. Disable it if you use neither, to save ~150Mi.
+  enabled: true
+  nodeOptions: --max-old-space-size=160
+  resources:
+    requests: { cpu: 10m, memory: 128Mi }
+    limits: { memory: 256Mi }
+
+migrate:
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 384Mi }
+
+service:
+  type: ClusterIP
+  port: 3000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: tasks.example.com
+  tls: []
+  #  - secretName: tasks-tls
+  #    hosts: [tasks.example.com]
+
+# Give running tasks time to wind down on shutdown.
+terminationGracePeriodSeconds: 60
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

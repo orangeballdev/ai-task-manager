@@ -1,0 +1,126 @@
+name: Image - build and push to GHCR
+
+# Builds the app image on merge to main (skipping pushes that only touch the
+# chart or deploy files) and on demand, and pushes it to the GitHub
+# Container Registry as a private package under this repository's owner:
+#
+#   ghcr.io/<owner>/ai-task-manager
+#
+# One image serves every service in docker-compose.yml (migrate, app, worker,
+# integrations); they differ only by command.
+#
+# It gets two tags: `latest` and `sha-<short sha>`. Deploy the sha tag so a
+# rollout is pinned to one commit. Pulling needs a token with read:packages.
+# Only the three newest versions are kept, so roll back within those. The
+# layer cache lives in its own `ai-task-manager-buildcache` package.
+#
+# Builds from main are then deployed: the job commits the new sha tag to
+# charts/ai-task-manager/values-production.yaml on main, and the Argo CD
+# Application (deploy/argocd/ai-task-manager.yaml) syncs it. That commit
+# doesn't start another build: pushes made with GITHUB_TOKEN never trigger
+# workflows, and charts/** is ignored anyway.
+
+on:
+  push:
+    branches: [main]
+    # Chart and deploy-only pushes don't change the image. Docs and Markdown
+    # still build: they can carry updates for users.
+    paths-ignore:
+      - "charts/**"
+      - "deploy/**"
+  # Lets you build by hand: Actions -> Run workflow, or `gh workflow run images.yml`.
+  workflow_dispatch:
+
+permissions:
+  contents: write # deploy step commits the new image tag
+  packages: write
+
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build ai-task-manager
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Plain docker commands rather than the docker/* actions; buildx ships
+      # on the runner. GHCR repository names must be lowercase.
+      - name: Log in to GHCR
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build and push
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/ai-task-manager"
+          cache="${image}-buildcache:latest"
+          # The default docker driver cannot export a registry cache.
+          docker buildx create --use --driver docker-container >/dev/null
+          # provenance and sbom off: one plain manifest per push, so every
+          # package version is a whole image and the cleanup can never delete
+          # a piece of a kept one.
+          docker buildx build . \
+            --file Dockerfile \
+            --platform linux/amd64 \
+            --tag "${image}:latest" \
+            --tag "${image}:sha-${GITHUB_SHA::7}" \
+            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --cache-from "type=registry,ref=${cache}" \
+            --cache-to "type=registry,ref=${cache},mode=max,image-manifest=true" \
+            --provenance=false \
+            --sbom=false \
+            --push
+
+      # Point Argo CD at the image just pushed. Only for main, so a manual
+      # build of another branch never deploys. Retries on a push race with a
+      # commit that landed during the build.
+      - name: Deploy to Argo CD
+        if: github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          tag="sha-${GITHUB_SHA::7}"
+          values=charts/ai-task-manager/values-production.yaml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git fetch --quiet origin main
+            git reset --quiet --hard origin/main
+            sed -i -E "s/^(  tag: ).*/\1${tag}/" "$values"
+            if git diff --quiet; then
+              echo "${values} already at ${tag}"
+              exit 0
+            fi
+            git commit --quiet -am "Deploy ${tag} [skip ci]"
+            if git push --quiet origin HEAD:main; then
+              echo "Deployed ${tag}"
+              exit 0
+            fi
+            echo "Push rejected (attempt ${attempt}), retrying"
+            sleep $((attempt * 5))
+          done
+          echo "Could not push the image tag bump" >&2
+          exit 1
+
+      # GHCR has no retention policy of its own. Keep the three newest
+      # versions (the newest is `latest`) and delete the rest.
+      - name: Delete old versions
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ai-task-manager
+          package-type: container
+          min-versions-to-keep: 3
+
+      # Each build overwrites the cache tag and leaves the previous cache
+      # behind untagged.
+      - name: Delete old build caches
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ai-task-manager-buildcache
+          package-type: container
+          delete-only-untagged-versions: "true"
+          min-versions-to-keep: 0

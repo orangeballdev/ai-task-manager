@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "AIProvider" ADD COLUMN "maxUsagePercent" INTEGER NOT NULL DEFAULT 100;

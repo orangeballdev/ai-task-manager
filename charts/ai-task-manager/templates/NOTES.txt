@@ -1,0 +1,12 @@
+ai-task-manager is deploying to namespace {{ .Release.Namespace }} as a single pod
+(app + worker{{ if .Values.integrations.enabled }} + integrations{{ end }}).
+
+{{- if .Values.ingress.enabled }}
+Open: http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.host }}
+{{- else }}
+Reach it locally:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "atm.fullname" . }} 3000:{{ .Values.service.port }}
+{{- end }}
+
+First sign-in: the owner account's password is "changeme"; change it right away.
+The data volume is kept on `helm uninstall`; delete the PVC yourself to wipe it.

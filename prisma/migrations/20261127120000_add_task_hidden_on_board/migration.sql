@@ -1,0 +1,1 @@
+ALTER TABLE "Task" ADD COLUMN "hiddenOnBoard" BOOLEAN NOT NULL DEFAULT false;

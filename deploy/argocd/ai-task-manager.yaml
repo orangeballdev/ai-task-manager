@@ -1,0 +1,32 @@
+# Argo CD Application for the VPS cluster.
+#   kubectl apply -f deploy/argocd/ai-task-manager.yaml
+# Repo access: secret `repo-ai-task-manager` in the argocd namespace (read-only
+# deploy key). Image pulls: docker-registry secret `ghcr-pull` in the
+# ai-task-manager namespace, created by hand (token with only read:packages).
+# Deploys are automatic: .github/workflows/images.yml builds on merge to main
+# and commits the new sha-<short sha> tag to
+# charts/ai-task-manager/values-production.yaml, which Argo CD then syncs.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ai-task-manager
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:orangeballdev/ai-task-manager.git
+    targetRevision: main
+    path: charts/ai-task-manager
+    helm:
+      # Cluster values live in the chart so the image pipeline can bump the
+      # tag in git; this Application only needs re-applying when it changes.
+      valueFiles:
+        - values-production.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ai-task-manager
+  syncPolicy:
+    automated:
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
