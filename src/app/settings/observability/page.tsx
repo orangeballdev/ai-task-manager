@@ -23,7 +23,7 @@ import {
 import { CheckCircle2, Plus, Trash2, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { UserMonitoringCard } from "@/components/settings/UserMonitoringCard";
+import { UserMonitoringCard } from "@/app/settings/_components/UserMonitoringCard";
 
 // Destinations are edited through their own route (/api/settings/otel/destinations),
 // not as individual Setting rows.

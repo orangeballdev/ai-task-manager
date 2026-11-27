@@ -21,7 +21,7 @@ import { columnFor } from "../kanban-column";
 import type { Task } from "../types";
 
 // The example from the feature request: commit 65948886 pushed by hand to develop.
-const LOGS_SAAS = "git@github.com:acme/widgets.git";
+const WIDGETS_REPO = "git@github.com:acme/widgets.git";
 const DESCRIPTION =
   "Show the executive summary read-only until the poster chooses Edit.\n\n" +
   "Commit 65948886 on develop: the summary now renders as text and only becomes editable after clicking Edit.";
@@ -34,7 +34,7 @@ test("creates a review-only task with a description and metadata, straight into 
     description: DESCRIPTION,
     labels: ["frontend"],
     notes: "Pushed from another Claude session",
-    reviewMetadata: { repo: LOGS_SAAS, branch: "develop", commits: ["65948886"] },
+    reviewMetadata: { repo: WIDGETS_REPO, branch: "develop", commits: ["65948886"] },
   });
   assert.ok(plan.ok);
   const d = plan.data;
@@ -42,7 +42,7 @@ test("creates a review-only task with a description and metadata, straight into 
   assert.equal(d.description, DESCRIPTION);
   assert.equal(d.labels, JSON.stringify(["frontend"]));
   assert.equal(d.notes, "Pushed from another Claude session");
-  assert.equal(d.reviewRepo, LOGS_SAAS);
+  assert.equal(d.reviewRepo, WIDGETS_REPO);
   assert.equal(d.reviewBranch, "develop");
   assert.equal(d.reviewCommits, JSON.stringify(["65948886"]));
   assert.equal(d.reviewPrUrl, undefined);
@@ -53,7 +53,7 @@ test("creates a review-only task with a description and metadata, straight into 
 
   const row = { ...d, prUrl: null, prUrls: null } as unknown as Task;
   assert.equal(columnFor(row), "in_review");
-  assert.deepEqual(readReviewMetadata(d), { repo: LOGS_SAAS, branch: "develop", commits: ["65948886"], prUrl: null });
+  assert.deepEqual(readReviewMetadata(d), { repo: WIDGETS_REPO, branch: "develop", commits: ["65948886"], prUrl: null });
 });
 
 test("the title defaults from the description, like any task", () => {
@@ -72,7 +72,7 @@ test("the description is required", () => {
 });
 
 test("run options are rejected, not silently dropped", () => {
-  const withRepos = planReviewOnlyCreate({ description: "d", repos: [{ url: LOGS_SAAS }] });
+  const withRepos = planReviewOnlyCreate({ description: "d", repos: [{ url: WIDGETS_REPO }] });
   assert.ok(!withRepos.ok && /repos/.test(withRepos.message) && /reviewMetadata\.repo/.test(withRepos.message));
   const scheduled = planReviewOnlyCreate({ description: "d", cronExpression: "0 9 * * *", teamId: "t1" });
   assert.ok(!scheduled.ok && /cronExpression, teamId/.test(scheduled.message));
@@ -118,7 +118,7 @@ test("the PR link must be an http(s) URL", () => {
 });
 
 test("the repo must be a Git URL; the branch a branch name", () => {
-  for (const ok of [LOGS_SAAS, "https://github.com/acme/web.git", "ssh://git@host:22/acme/web.git", "https://gitlab.com/a/b"]) {
+  for (const ok of [WIDGETS_REPO, "https://github.com/acme/web.git", "ssh://git@host:22/acme/web.git", "https://gitlab.com/a/b"]) {
     assert.ok(isGitUrl(ok), ok);
   }
   const badRepo = parseReviewMetadata({ repo: "logs-saas" });
@@ -226,7 +226,7 @@ test("list_tasks search matches commit SHAs and PR URLs", () => {
 
 test("commits and branches link to GitHub only for GitHub repos", () => {
   assert.equal(
-    githubCommitUrl({ repo: LOGS_SAAS, prUrl: null }, "65948886"),
+    githubCommitUrl({ repo: WIDGETS_REPO, prUrl: null }, "65948886"),
     "https://github.com/acme/widgets/commit/65948886",
   );
   assert.equal(githubBranchUrl({ repo: "https://github.com/acme/web.git", prUrl: null }, "feat/x"), "https://github.com/acme/web/tree/feat/x");
