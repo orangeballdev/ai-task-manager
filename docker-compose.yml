@@ -1,10 +1,21 @@
-# One image serves every service. Only `migrate` builds it, and the others
-# reuse the tag. Giving each service its own `build: .` built the same image
-# four times per rebuild.
+# Runs the prebuilt image from GHCR (multi-arch, built from main by
+# .github/workflows/images.yml):
+#
+#   docker compose up -d                  # pull the image if missing, then start
+#   docker compose pull && docker compose up -d   # update to the newest image
+#   docker compose up --build -d          # build from this checkout instead
+#
+# AI_TASK_MANAGER_TAG pins a build (e.g. sha-c998d37; default latest) and
+# AI_TASK_MANAGER_PORT picks the host port (default 3000).
+#
+# One image serves every service. Only `migrate` has a `build:`, and the others
+# reuse its tag. Giving each service its own `build: .` built the same image
+# four times per rebuild. A `--build` tags the local build with the same name,
+# so a later `docker compose pull` replaces it with the published image again.
 services:
   migrate:
     build: .
-    image: ai-task-manager:local
+    image: ghcr.io/orangeballdev/ai-task-manager:${AI_TASK_MANAGER_TAG:-latest}
     command: npx prisma migrate deploy
     environment:
       DATABASE_URL: file:/data/dev.db
@@ -13,8 +24,7 @@ services:
     restart: "no"
 
   app:
-    image: ai-task-manager:local
-    pull_policy: never
+    image: ghcr.io/orangeballdev/ai-task-manager:${AI_TASK_MANAGER_TAG:-latest}
     command: node .next/standalone/server.js
     environment:
       DATABASE_URL: file:/data/dev.db
@@ -41,8 +51,7 @@ services:
     restart: unless-stopped
 
   worker:
-    image: ai-task-manager:local
-    pull_policy: never
+    image: ghcr.io/orangeballdev/ai-task-manager:${AI_TASK_MANAGER_TAG:-latest}
     command: npx tsx src/worker/index.ts
     # Reap orphaned git/esbuild children; npm as PID 1 leaves them as zombies.
     init: true
@@ -69,8 +78,7 @@ services:
     restart: unless-stopped
 
   integrations:
-    image: ai-task-manager:local
-    pull_policy: never
+    image: ghcr.io/orangeballdev/ai-task-manager:${AI_TASK_MANAGER_TAG:-latest}
     command: npx tsx src/integrations/index.ts
     environment:
       DATABASE_URL: file:/data/dev.db

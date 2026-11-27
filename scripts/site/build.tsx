@@ -239,23 +239,23 @@ function absoluteMarkdown(markdown: string): string {
 }
 
 /**
- * The docker-compose.yml the installer downloads: the repo's own compose file, switched
- * from building `ai-task-manager:local` to pulling the published image. Derived rather than
- * kept as a second copy, so the two can't drift; fails loudly if the source changes shape.
+ * The docker-compose.yml the installer downloads: the repo's own compose file (which
+ * already runs the published image) without its `build:` (an install has no source to
+ * build). Derived rather than kept as a second copy, so the two can't drift; fails
+ * loudly if the source changes shape.
  */
 function releaseCompose(): string {
   const src = fs.readFileSync(path.join(ROOT, "docker-compose.yml"), "utf8");
+  const imageLine = `    image: ${IMAGE}:\${AI_TASK_MANAGER_TAG:-latest}`;
   const count = (re: RegExp) => (src.match(re) ?? []).length;
-  const services = count(/^ {4}image: ai-task-manager:local$/gm);
-  if (services < 2 || count(/^ {4}build: \.$/gm) !== 1 || count(/^ {4}pull_policy: never$/gm) !== services - 1) {
+  const services = src.split("\n").filter((line) => line === imageLine).length;
+  if (services < 2 || count(/^ {4}image: /gm) !== services || count(/^ {4}build: \.$/gm) !== 1) {
     throw new Error("docker-compose.yml no longer matches what releaseCompose() expects; update it in scripts/site/build.tsx");
   }
   const body = src
     .replace(/^(#.*\n)+/, "")
-    .replace(/^ {4}build: \.\n/gm, "")
-    .replace(/^ {4}pull_policy: never\n/gm, "")
-    // Multi-arch (amd64 + arm64, see images.yml), so Docker picks the host's platform.
-    .replace(/^ {4}image: ai-task-manager:local$/gm, `    image: ${IMAGE}:\${AI_TASK_MANAGER_TAG:-latest}`);
+    // The image is multi-arch (amd64 + arm64, see images.yml), so Docker picks the host's platform.
+    .replace(/^ {4}build: \.\n/gm, "");
   return [
     `# ${PRODUCT_NAME}: run the published image with Docker Compose.`,
     `#`,

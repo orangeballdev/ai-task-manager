@@ -25,15 +25,15 @@ This is the easiest way to run it. You only need **Docker** with the Compose plu
 curl -fsSL https://aitaskmanager.orangeball.dev/install.sh | sh
 ```
 
-It installs into `./ai-task-manager`, falls back to building from source if the image can't be pulled, and updates in place when you run it again. Or build from a clone:
+It installs into `./ai-task-manager`, falls back to building from source if the image can't be pulled, and updates in place when you run it again. Or run it from a clone, which uses the same prebuilt image ([`ghcr.io/orangeballdev/ai-task-manager`](https://github.com/orangeballdev/ai-task-manager/pkgs/container/ai-task-manager), amd64 and arm64):
 
 ```bash
-git clone git@github.com:orangeballdev/ai-task-manager.git
+git clone https://github.com/orangeballdev/ai-task-manager.git
 cd ai-task-manager
-docker compose up --build -d
+docker compose up -d               # or: docker compose up --build -d to build from source
 ```
 
-The first build takes a few minutes. Compose runs the database migrations, then starts three containers:
+Compose runs the database migrations, then starts three containers:
 
 | Container | What it does |
 |-----------|--------------|
@@ -53,7 +53,9 @@ The `worker` container mounts `~/.ssh` read-only, so it clones and pushes with y
 
 ```bash
 docker compose logs -f worker      # follow the worker's output
-docker compose up --build -d       # rebuild after pulling new code
+docker compose pull && docker compose up -d   # update to the newest image
+AI_TASK_MANAGER_TAG=sha-c998d37 docker compose up -d   # pin (or roll back to) one build
+docker compose up --build -d       # build from this checkout instead
 docker compose down                # stop (data is kept)
 docker compose down -v             # stop AND delete all data
 ```
@@ -190,7 +192,7 @@ For a deeper tour of the codebase, see [CLAUDE.md](CLAUDE.md).
 ## Other deployment options
 
 - **Kubernetes:** a Helm chart is in [charts/ai-task-manager](charts/ai-task-manager/README.md).
-- **Auto-deploy on push to `main`** (single self-hosted box): `scripts/deploy-on-main-update.sh` fetches `origin/main` and, if it moved, fast-forwards and runs `docker compose up --build -d`. Run it from a dedicated deploy clone with a systemd timer or cron job every few minutes.
+- **Auto-update** (single self-hosted box): `scripts/deploy-on-main-update.sh` fast-forwards the clone to `origin/main` (for compose file changes), pulls the newest image and restarts only the containers whose image changed. Run it from a dedicated deploy clone with a systemd timer or cron job every few minutes; a new image is picked up once `images.yml` has published it.
 
 ---
 
