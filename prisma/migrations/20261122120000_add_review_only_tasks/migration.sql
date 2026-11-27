@@ -1,0 +1,5 @@
+ALTER TABLE "Task" ADD COLUMN "reviewOnly" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Task" ADD COLUMN "reviewRepo" TEXT;
+ALTER TABLE "Task" ADD COLUMN "reviewBranch" TEXT;
+ALTER TABLE "Task" ADD COLUMN "reviewCommits" TEXT;
+ALTER TABLE "Task" ADD COLUMN "reviewPrUrl" TEXT;

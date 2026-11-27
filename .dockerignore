@@ -1,0 +1,14 @@
+node_modules
+.next
+prisma/*.db
+prisma/dev.db
+.env
+.env.local
+.git
+data
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+tsconfig.tsbuildinfo
+.claude

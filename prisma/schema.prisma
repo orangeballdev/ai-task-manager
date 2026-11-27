@@ -1,0 +1,579 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model AIProvider {
+  id        String   @id @default(cuid())
+  name      String
+  type      String   // "cli" | "api" | "openai" | "claude-pki" | "codex-cli"
+  isDefault Boolean  @default(false)
+  isEnabled Boolean  @default(true)
+  // When true, this provider is skipped by the Smart Provider Picker's auto-selection (both
+  // the per-task opt-in and the global default) but remains selectable explicitly and by the
+  // regular default/fallback tiers. Distinct from isEnabled, which removes it everywhere.
+  excludeFromSmartPicker Boolean @default(false)
+  // Highest share (percent, 1-100) of a subscription's plan window (5-hour / weekly) the task
+  // manager may use. Once either window reaches it, the provider is treated as throttled until
+  // that window resets, leaving the rest for the user's own manual use. 100 = no cap.
+  // Only subscription CLIs (`cli`, `codex-cli`) report usage, so it has no effect on others.
+  maxUsagePercent Int @default(100)
+  // CLI-specific
+  configDir       String?
+  credentialsJson String?
+  // API / OpenAI-specific
+  apiKey    String?
+  baseUrl   String?
+  model     String?
+  // claude-pki-specific: mutual-TLS auth against a self-hosted Claude-compatible endpoint
+  pkiCertData       Bytes?   // raw .p12 client certificate bundle
+  pkiCertFilename   String?  // original filename, for display only
+  pkiCertPassphrase String?  // passphrase to unlock the .p12 bundle
+  proxyUrl          String?  // optional HTTP(S) proxy the request is tunneled through
+  throttledUntil          DateTime?
+  authFailureNotifiedAt   DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tasks     Task[]
+}
+
+model File {
+  id        String   @id @default(cuid())
+  taskId    String?
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  parentId  String?
+  parent    File?    @relation("FileTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  File[]   @relation("FileTree")
+  name      String
+  isFolder  Boolean  @default(false)
+  content   String?
+  blob      Bytes?
+  mimeType  String?
+  size      Int?
+  // When true, this file/folder is exempt from automatic file cleanup
+  // (see src/lib/cleanup.ts). Protecting a folder also protects everything
+  // nested inside it, since deleting a folder cascades to its children.
+  protected Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentId])
+  @@index([taskId])
+}
+
+model Task {
+  id            String    @id @default(cuid())
+  title         String
+  description   String
+  context       String?
+  provider      String    @default("cli")
+  model         String?
+  outputType    String    @default("repository")
+  status        String    @default("pending")
+  position      Int       @default(0)
+  // Manual priority set in Advanced Options at creation/edit time. One of
+  // "low" | "normal" | "high" | "urgent" (see src/lib/priority.ts). The worker
+  // sorts pending/paused/throttled tasks by priority (desc) before position (asc)
+  // when picking up the next task to run — see src/worker/index.ts.
+  priority      String    @default("normal")
+  // Optional thinking-effort override set in Advanced Options (one of
+  // "low" | "medium" | "high" | "xhigh" | "max", see src/lib/effort.ts).
+  // Null means "use the provider's own default" — the worker passes this
+  // through as `--effort` on the Claude CLI or `output_config.effort` on
+  // the Anthropic API (see src/lib/providers/cli.ts and api.ts).
+  effort        String?
+  retryCount    Int       @default(0)
+  // Counts "Review PR" self-review re-runs (see review-pr route + src/lib/review-pr.ts),
+  // tracked separately from retryCount. A review re-run — whether the agent finds nothing
+  // to change or makes revisions — is an expected iteration step, not a failure/retry, so
+  // it must not bump retryCount (which the UI surfaces as a "Retry count" failure signal).
+  // The worker still treats retryCount > 0 OR reviewIterationCount > 0 as "resume" (reuse
+  // the existing on-disk workspace/branch) — see shouldResumeTask() in src/lib/resume.ts.
+  reviewIterationCount Int @default(0)
+  nextRetryAt   DateTime?
+  scheduledFor  DateTime?
+  workspacePath         String?
+  inputTokens           Int?
+  outputTokens          Int?
+  estimatedCost         Float?
+  branchName            String?
+  commitSha             String?
+  prSummary             String?
+  cronExpression        String?
+  // Recurring-template run cap. `maxRuns` is null for "unlimited" (the default); when set,
+  // the worker stops spawning instances once `runCount` reaches it. `runCount` only counts
+  // cron-triggered spawns — manual "Run now" / Hail Mary bursts are deliberately excluded so
+  // an ad-hoc run never eats into the user's configured schedule budget.
+  maxRuns               Int?
+  runCount              Int       @default(0)
+  pushToMain            Boolean   @default(false)
+  targetBranch          String?
+  createPR              Boolean   @default(false)
+  prUrl                 String?
+  prNumber              Int?
+  // JSON map of repo alias -> { url, number, merged? }. A task with multiple repos
+  // creates one PR per repo; prUrl/prNumber above only ever hold the *first* PR (kept
+  // for backward compatibility). PR-merge sync must check every entry here before
+  // moving a task from In Review to Done, otherwise multi-repo tasks flip to Done as
+  // soon as any single (possibly unrelated) PR looks merged.
+  // JSON map of repo alias -> { url, number } for tasks with PRs across multiple repos
+  prUrls                String?
+  prError               String?
+  mergeableState        String?   // "mergeable" | "conflicting" | "unknown"
+  ciStatus              String?   // "passing" | "failing" | "pending" | "none"
+  hasConflict           Boolean   @default(false)
+  conflictMessage       String?
+  // Set once we detect the task's PR/MR merged with an empty diff (no file
+  // changes). These are kept out of the auto "merged -> Done" transition so
+  // they stay visible in In Review for a human to close out deliberately.
+  noChanges             Boolean   @default(false)
+  tokenBudget           Int?
+  costBudget            Float?
+  attachments           String?
+  attachmentsFolder     String?
+  contextFiles          String?
+  notes                 String?
+  labels                String?
+  // Set when this task was created by the inbound-email integration (see
+  // src/app/api/integrations/email/inbound/route.ts). Holds the original sender's
+  // address so the worker can email them a completion/failure reply, closing the
+  // "forward an email -> get a task -> hear back" loop independent of the global
+  // admin notification settings.
+  sourceEmail           String?
+  testPlan              String?
+  reviewStatus          String?
+  systemPrompt          String?
+  isRecurringTemplate   Boolean   @default(false)
+  isEnabled             Boolean   @default(true)
+  isHailMary            Boolean   @default(false)
+  createValidationTask  Boolean   @default(false)
+  useSmartProvider      Boolean   @default(false)
+  lastScheduledAt       DateTime?
+  recurringTemplateId   String?
+  hailMaryEligible      Boolean   @default(false)
+  hailMaryBurstLimit    Int?
+  aiProviderId          String?
+  dependsOnTaskId       String?
+  // When set, this task is executed by a Team pipeline instead of a single agent — see
+  // src/lib/teams.ts and the "Team pipeline" section of src/worker/index.ts. The worker
+  // looks up the team's members (ordered by TeamMember.position) at run time rather than
+  // snapshotting them onto the task, so editing a team's roster/order after task creation
+  // still takes effect the next time the task runs.
+  teamId                String?
+  // Live progress of the most recent Team pipeline run (JSON, see src/lib/team-progress.ts):
+  // one entry per stage with its status (pending/running/completed/failed/skipped) and
+  // timings. Written by the worker at every stage transition; read by the task page's
+  // team progress tracker. Null for single-agent tasks and team tasks that haven't run.
+  teamProgress          String?
+  // Trace/span id (hex) of the latest run's `task.run` span, saved when the run starts so a
+  // `human_review` evaluation sent hours later can be parented on the run it judges
+  // (see recordTaskReview()). Null until the first run with tracing on.
+  telemetryTraceId      String?
+  telemetrySpanId       String?
+  // Per-task agent tool access overrides — JSON map of tool id -> boolean, e.g.
+  // {"github-cli": true}. A tool missing from the map follows the global default
+  // from Settings -> Agent Tools (`agent_tool_defaults`). Null = all defaults.
+  // See src/lib/agent-tools.ts; applied by the worker via src/lib/agent-tools-runtime.ts.
+  toolAccess            String?
+  // "Allow subtasks" (Advanced Options). When true the agent is told it may queue
+  // follow-up tasks by writing `.subtasks.json` at its workspace root; after a
+  // successful run the worker turns each entry into a new Task with
+  // `parentTaskId` pointing back here. Subtasks never inherit this flag, so a
+  // worker can't fan out recursively. See src/lib/subtasks.ts.
+  allowSubtasks         Boolean   @default(false)
+  // Review-only ticket: created straight into In Review as a reminder to review work
+  // done elsewhere (a hand-pushed commit, another Claude session). It never runs —
+  // the worker's pick-up query excludes it and every re-queue path refuses it — and
+  // is created as status "completed" + reviewStatus "in_review". See src/lib/review-only.ts.
+  reviewOnly            Boolean   @default(false)
+  // Hidden from the board's To Do column ("not now" tasks the user wants out of the way).
+  // Purely a display flag — it never changes whether or when the worker runs the task.
+  // Toggled per card or in bulk on the board; Board Settings → "Show hidden tasks" reveals them.
+  hiddenOnBoard         Boolean   @default(false)
+  // Review metadata the person attaches (all optional, editable later): the repo
+  // (a saved repo's URL or any Git URL), branch, commit SHAs as given (JSON array of
+  // 7–40 hex chars) and an http(s) PR link.
+  reviewRepo            String?
+  reviewBranch          String?
+  reviewCommits         String?
+  reviewPrUrl           String?
+  parentTaskId          String?
+  parentTask            Task?       @relation("Subtasks", fields: [parentTaskId], references: [id], onDelete: SetNull)
+  subtasks              Task[]      @relation("Subtasks")
+  recurringTemplate     Task?       @relation("RecurringInstances", fields: [recurringTemplateId], references: [id], onDelete: SetNull)
+  recurringInstances    Task[]      @relation("RecurringInstances")
+  aiProvider            AIProvider? @relation(fields: [aiProviderId], references: [id], onDelete: SetNull)
+  dependsOn             Task?       @relation("TaskDependency", fields: [dependsOnTaskId], references: [id], onDelete: SetNull)
+  dependents            Task[]      @relation("TaskDependency")
+  team                  Team?       @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  repos                 TaskRepo[]
+  logs                  TaskLog[]
+  messages              TaskMessage[]
+  files                 File[]
+
+  // Foreign-key lookups hit on every task delete: the route nulls these out, and
+  // SQLite's own ON DELETE SET NULL checks scan them. Without indexes each delete
+  // was a full table scan of Task (and of File, blobs included).
+  @@index([recurringTemplateId])
+  @@index([dependsOnTaskId])
+  @@index([parentTaskId])
+}
+
+// A reusable, ordered pipeline of specialized agents (e.g. Planner -> Coder -> Tester ->
+// Verifier) that a task can run through sequentially instead of a single agent handling
+// the whole task. See src/lib/teams.ts.
+model Team {
+  id        String       @id @default(cuid())
+  name      String
+  // At most one team is marked default at a time (enforced in src/lib/teams.ts, same
+  // pattern as AIProvider.isDefault) — the new-task form preselects it when "Use a
+  // team" is toggled on.
+  isDefault Boolean      @default(false)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  members   TeamMember[]
+  tasks     Task[]
+}
+
+model TeamMember {
+  id           String   @id @default(cuid())
+  teamId       String
+  team         Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  // Role/name label for this pipeline stage, e.g. "Planner", "Coder", "Tester".
+  name         String
+  // Free-text instructions/context for this stage, e.g. "Analyze the changes and
+  // verify there are no bugs". Injected into the stage's prompt alongside the
+  // previous stage's output — see buildTeamMemberContext in src/lib/teams.ts.
+  instructions String   @default("")
+  // Zero-based execution order within the team. The worker runs members in this
+  // order, and reordering via drag-and-drop persists immediately (see
+  // POST /api/teams/[id]/members/reorder).
+  position     Int      @default(0)
+  // Manual approval gate: when true, the pipeline stops after this member finishes
+  // and the task waits in "awaiting_approval" until a human approves the stage's
+  // output (or asks for a revision) before the next member runs. Typical use: a
+  // "Planner" stage whose plan should be signed off before any code is written.
+  // Has no effect on the last member. See src/lib/team-progress.ts.
+  requiresApproval Boolean @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([teamId])
+}
+
+model TaskMessage {
+  id        String    @id @default(cuid())
+  taskId    String
+  content   String
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model TaskRepo {
+  id     String  @id @default(cuid())
+  taskId String
+  alias  String
+  url    String
+  branch String?
+  task   Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model TaskLog {
+  id        String   @id @default(cuid())
+  taskId    String
+  content   String
+  level     String   @default("info")
+  // Name of the Team member (pipeline stage) that produced this line, for team tasks.
+  // Null for single-agent runs and for worker lines outside any stage.
+  member    String?
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model Setting {
+  key   String @id
+  value String
+}
+
+// A public API credential (see src/lib/api-auth.ts + src/app/api/v1/*). Created from
+// Settings -> API and required as a Bearer token on every /api/v1/* request. Only the
+// SHA-256 hash of the key is stored — the plaintext key is shown once, at creation time,
+// in the Settings UI (see src/app/settings/api/page.tsx) and never persisted or returned
+// again. `keyPrefix` is a short, non-secret slice kept for display so a key can be told
+// apart from others in the list without ever re-showing the secret.
+model ApiKey {
+  id         String    @id @default(cuid())
+  name       String
+  keyPrefix  String
+  keyHash    String    @unique
+  // Which provider the LLM gateway (/api/llm/v1/*) runs this key's requests on, chosen
+  // like a task's: useSmartProvider = smart pick, aiProviderId = a pinned connection, neither
+  // = the default chain. The pin is a plain id (no FK), so a deleted or disabled connection
+  // just falls through to smart pick → default → any enabled, as getProvider() does.
+  aiProviderId     String?
+  useSmartProvider Boolean   @default(false)
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+// A credential for the MCP server at /api/mcp (see src/lib/mcp/*). Managed from
+// Settings -> MCP and sent as `Authorization: Bearer tm_mcp_...` by MCP clients
+// (Claude Code, Claude Desktop, Cursor, ...). Like ApiKey, only the SHA-256 hash is
+// stored. `access` scopes what the token can do: "read" exposes only the read-only
+// tools (list/search/inspect tasks, logs, files, stats); "write" additionally exposes
+// the tools that create, edit, start, cancel, message and review tasks.
+model McpToken {
+  id         String    @id @default(cuid())
+  name       String
+  keyPrefix  String
+  keyHash    String    @unique
+  access     String    @default("read")
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  /// OAuth grants only (null for tokens created in Settings → MCP, which never expire).
+  /// One row per grant: refreshing rotates keyHash/refreshTokenHash in place.
+  expiresAt        DateTime?
+  oauthClientId    String?
+  oauthClient      OAuthClient? @relation(fields: [oauthClientId], references: [id], onDelete: Cascade)
+  refreshTokenHash String?      @unique
+  refreshExpiresAt DateTime?
+}
+
+/// An MCP client registered through OAuth dynamic client registration (POST /api/oauth/register),
+/// e.g. Claude Code, Claude Desktop or Codex. See src/lib/mcp/oauth.ts.
+model OAuthClient {
+  /// The OAuth client_id.
+  id                      String          @id
+  name                    String
+  /// JSON array of registered redirect URIs.
+  redirectUris            String
+  /// "none" (public client, PKCE only) or "client_secret_post"/"client_secret_basic".
+  tokenEndpointAuthMethod String          @default("none")
+  secretHash              String?
+  clientUri               String?
+  createdAt               DateTime        @default(now())
+  lastUsedAt              DateTime?
+  tokens                  McpToken[]
+  codes                   OAuthAuthCode[]
+}
+
+/// Single-use authorization codes (10-minute lifetime) issued by the consent page.
+model OAuthAuthCode {
+  id            String      @id @default(cuid())
+  codeHash      String      @unique
+  clientId      String
+  client        OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  redirectUri   String
+  codeChallenge String
+  access        String      @default("read")
+  resource      String?
+  expiresAt     DateTime
+  createdAt     DateTime    @default(now())
+}
+
+/// An external MCP server made available to agents (Settings → MCP Servers).
+/// Enabled servers are handed to every task run through the agent CLI's MCP config
+/// (see src/lib/mcp-servers.ts). `args`/`env`/`headers` are JSON; env and header values
+/// are secrets and are masked by the API.
+model McpServer {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  transport   String   @default("stdio")
+  command     String?
+  args        String   @default("[]")
+  env         String   @default("{}")
+  url         String?
+  headers     String   @default("{}")
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Webhook {
+  id              String         @id @default(cuid())
+  name            String
+  slug            String         @unique
+  secretToken     String
+  secretHeader    String         @default("X-Webhook-Secret")
+  taskTitle       String
+  taskDescription String
+  taskContext     String?
+  repoUrl         String?
+  repoAlias       String?
+  isEnabled       Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  events          WebhookEvent[]
+}
+
+model WebhookEvent {
+  id           String   @id @default(cuid())
+  webhookId    String
+  webhook      Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  status       String
+  taskId       String?
+  errorMessage String?
+  createdAt    DateTime @default(now())
+}
+
+model SlackConversation {
+  threadTs  String   @id
+  channelId String
+  messages  String   // JSON: ChatMessage[]
+  proposed  String?  // JSON: ProposedTask when AI has proposed one
+  taskId    String?  // set when task is created from this conversation
+  notified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Integration {
+  id        String   @id  // e.g. "slack"
+  name      String
+  isEnabled Boolean  @default(false)
+  config    String?  // JSON: integration-specific config (may include sensitive tokens)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model KnowledgeEntry {
+  id        String   @id @default(cuid())
+  scope     String   @default("general") // git remote URL/name or "general"
+  type      String   // "task_history" | "design_spec"
+  title     String
+  content   String   @default("") // markdown
+  tags      String?  // JSON-encoded string[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([scope])
+  @@index([type])
+}
+
+// ---------------------------------------------------------------------------
+// Authentication (see src/lib/auth/*). The app is single-tenant: every signed-in
+// user sees the same tasks, settings and integrations. Accounts exist to keep the
+// UI and the internal API off the open internet, not to partition data.
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique // always stored lower-cased (normalizeEmail())
+  name         String?
+  // scrypt hash ("scrypt$N$r$p$salt$hash", see src/lib/auth/password.ts). Null = no password.
+  passwordHash String?
+  // When true, signing in with email + password is refused for this account; only a
+  // passkey works. Can only be turned on while the account has at least one passkey,
+  // and deleting the last passkey turns it back off so the account can't lock itself out.
+  passwordLoginDisabled Boolean @default(false)
+  // Set for accounts whose password was provisioned for them (e.g. the seeded owner
+  // account); the UI nags until it's changed.
+  mustChangePassword Boolean @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  passkeys     Passkey[]
+  sessions     Session[]
+  signInEvents SignInEvent[]
+}
+
+// A WebAuthn credential registered to a user.
+model Passkey {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId String    @unique // base64url
+  publicKey    Bytes
+  counter      Int       @default(0)
+  transports   String?   // JSON array of AuthenticatorTransportFuture
+  deviceType   String?   // "singleDevice" | "multiDevice"
+  backedUp     Boolean   @default(false)
+  name         String
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  @@index([userId])
+}
+
+// A browser login. The cookie holds a random token; only its SHA-256 hash is stored.
+model Session {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique
+  method     String   // "password" | "passkey" | "signup"
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  expiresAt  DateTime
+
+  @@index([userId])
+}
+
+// Audit trail of every sign-in attempt (successful or not), sign-up and sign-out.
+model SignInEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email     String?  // what was typed / resolved, kept even if the user is later deleted
+  method    String   // "password" | "passkey" | "signup" | "logout"
+  success   Boolean
+  reason    String?  // failure reason code, e.g. "bad_password", "password_login_disabled"
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId])
+}
+
+// Short-lived WebAuthn challenge, referenced by an httpOnly cookie between the
+// options and verify calls of a passkey ceremony.
+model AuthChallenge {
+  id        String   @id @default(cuid())
+  challenge String
+  type      String   // "register" | "authenticate"
+  userId    String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// One request through the LLM gateway (/api/llm/v1/*), recorded when the request ends
+// (streamed responses: when the client has read the last event). Feeds the "Token spend by
+// source" section on /analytics, which compares task-run tokens against gateway traffic.
+// apiKeyId/providerId are plain ids (no FK) so deleting a key or connection keeps its history;
+// the names are snapshots for display.
+model LlmGatewayUsage {
+  id                  String   @id @default(cuid())
+  apiKeyId            String
+  apiKeyName          String
+  format              String   // "openai" | "anthropic" — the API the client spoke
+  providerId          String?
+  providerName        String?
+  providerType        String?
+  model               String?
+  inputTokens         Int      @default(0)
+  outputTokens        Int      @default(0)
+  cacheReadTokens     Int      @default(0)
+  cacheCreationTokens Int      @default(0)
+  estimatedCost       Float?
+  errorType           String?  // null = success
+  durationMs          Int      @default(0)
+  createdAt           DateTime @default(now())
+
+  @@index([createdAt])
+}

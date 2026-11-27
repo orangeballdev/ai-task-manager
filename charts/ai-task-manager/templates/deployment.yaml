@@ -1,0 +1,169 @@
+{{- $pullSecrets := .Values.imagePullSecrets }}
+{{- if .Values.imageCredentials.password }}
+{{- $pullSecrets = append $pullSecrets (dict "name" (printf "%s-pull" (include "atm.fullname" .))) }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "atm.fullname" . }}
+  labels: {{- include "atm.labels" . | nindent 4 }}
+spec:
+  # SQLite has one writer and the volume is ReadWriteOnce: never run two pods,
+  # not even briefly during a rollout.
+  replicas: 1
+  # Old ReplicaSets are only for `kubectl rollout undo`; keep the list short.
+  revisionHistoryLimit: 2
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {{- include "atm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "atm.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/env: {{ toJson .Values.secretEnv | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      # Agents run arbitrary commands in this pod; give them no Kubernetes
+      # API credentials.
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext:
+        # Everything runs as the image's appuser (uid 1001). The image's
+        # entrypoint starts as root and drops privileges with gosu, which spins
+        # forever on some newer kernels (seen on 7.0), so the chart bypasses it:
+        # one root init container fixes volume ownership and every other
+        # container sets `command` and starts as appuser directly.
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        fsGroupChangePolicy: OnRootMismatch
+      {{- with $pullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # Kubernetes creates subPath dirs as root; hand them to appuser
+        # (uid 1001) before anything else runs. The only container run as root.
+        - name: volume-perms
+          image: {{ include "atm.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["chown", "1001:1001", "/data", "/workspaces", "/home/appuser/.claude"]
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+          volumeMounts: {{- include "atm.mounts" . | nindent 12 }}
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { memory: 64Mi }
+        - name: migrate
+          image: {{ include "atm.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["npx", "prisma", "migrate", "deploy"]
+          env: {{- include "atm.env" . | nindent 12 }}
+          volumeMounts: {{- include "atm.mounts" . | nindent 12 }}
+          resources: {{- toYaml .Values.migrate.resources | nindent 12 }}
+        {{- if .Values.ssh.existingSecret }}
+        # Secret volumes come out group-readable under fsGroup, which ssh
+        # rejects; copy the keys into ~/.ssh with 0600 instead.
+        - name: ssh-keys
+          image: {{ include "atm.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["sh", "-c", "cp -L /ssh-src/* /ssh/ && chown -R 1001:1001 /ssh && chmod 700 /ssh && chmod 600 /ssh/*"]
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+          volumeMounts:
+            - { name: ssh-src, mountPath: /ssh-src, readOnly: true }
+            - { name: ssh, mountPath: /ssh }
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { memory: 64Mi }
+        {{- end }}
+      # worker and integrations run TypeScript through `node --import tsx`, not
+      # `npx tsx`: that is one Node process instead of npm exec + the tsx
+      # launcher + Node (~130Mi less per container, enough to OOM-kill
+      # integrations at 256Mi), and SIGTERM reaches the app directly.
+      containers:
+        - name: app
+          image: {{ include "atm.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: {{ include "atm.command" . }}
+          args: ["node", ".next/standalone/server.js"]
+          ports:
+            - { name: http, containerPort: 3000 }
+          env:
+            {{- include "atm.env" . | nindent 12 }}
+            - { name: HOSTNAME, value: 0.0.0.0 }
+            - { name: PORT, value: "3000" }
+            {{- with .Values.app.nodeOptions }}
+            - { name: NODE_OPTIONS, value: {{ . | quote }} }
+            {{- end }}
+          {{- include "atm.envFrom" . | nindent 10 }}
+          volumeMounts: {{- include "atm.mounts" . | nindent 12 }}
+          startupProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet: { path: /login, port: http }
+            periodSeconds: 20
+            timeoutSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 30
+          resources: {{- toYaml .Values.app.resources | nindent 12 }}
+        - name: worker
+          image: {{ include "atm.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: {{ include "atm.command" . }}
+          args: ["node", "--import", "tsx", "src/worker/index.ts"]
+          # NODE_OPTIONS deliberately unset here: the agent CLIs and builds
+          # the worker spawns would inherit it.
+          env: {{- include "atm.env" . | nindent 12 }}
+          {{- include "atm.envFrom" . | nindent 10 }}
+          volumeMounts:
+            {{- include "atm.mounts" . | nindent 12 }}
+            {{- if .Values.ssh.existingSecret }}
+            - { name: ssh, mountPath: /home/appuser/.ssh }
+            {{- end }}
+          resources: {{- toYaml .Values.worker.resources | nindent 12 }}
+        {{- if .Values.integrations.enabled }}
+        - name: integrations
+          image: {{ include "atm.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: {{ include "atm.command" . }}
+          args: ["node", "--import", "tsx", "src/integrations/index.ts"]
+          env:
+            {{- include "atm.env" . | nindent 12 }}
+            {{- with .Values.integrations.nodeOptions }}
+            - { name: NODE_OPTIONS, value: {{ . | quote }} }
+            {{- end }}
+          {{- include "atm.envFrom" . | nindent 10 }}
+          volumeMounts: {{- include "atm.mounts" . | nindent 12 }}
+          resources: {{- toYaml .Values.integrations.resources | nindent 12 }}
+        {{- end }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (printf "%s-data" (include "atm.fullname" .)) }}
+        {{- if .Values.ssh.existingSecret }}
+        - name: ssh-src
+          secret:
+            secretName: {{ .Values.ssh.existingSecret }}
+        - name: ssh
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}

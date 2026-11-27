@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ai-task-manager
+description: AI task manager - web app, background worker and integrations in one pod, backed by SQLite on a single volume.
+type: application
+version: 0.1.0
+appVersion: "latest"
