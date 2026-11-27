@@ -170,7 +170,7 @@ function DestinationEditor({ dest, index, exportEnabled, globalSignals, onChange
             value={dest.name}
             onChange={(e) => onChange({ name: e.target.value })}
             onBlur={() => onCommit({ name: dest.name.trim() })}
-            placeholder="e.g. Grafana Cloud"
+            placeholder="e.g. ObiStack"
           />
         </div>
         <div className="flex flex-col gap-2">
