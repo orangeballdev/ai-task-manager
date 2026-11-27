@@ -56,7 +56,7 @@ export function Layout({
             <a className="copyright" href={OWNER_URL} target="_blank" rel="noopener noreferrer">
               <img src={`${prefix}orangeball.svg`} alt="" width={20} height={20} />
               <span>
-                © {new Date().getFullYear()} {OWNER_NAME} · {PRODUCT_NAME} is MIT licensed
+                © {new Date().getFullYear()} {OWNER_NAME}
               </span>
             </a>
             <span>
