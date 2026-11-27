@@ -73,6 +73,9 @@ pre:hover .copy, pre .copy:focus { opacity: 1; }
 .footer { border-top: 1px solid var(--border); margin-top: 96px; }
 .footer-inner { padding-top: 28px; padding-bottom: 28px; color: var(--faint); font-size: 14px; gap: 16px; flex-wrap: wrap; }
 .footer a { color: var(--muted); }
+.copyright { display: inline-flex; align-items: center; gap: 10px; color: var(--faint) !important; }
+.copyright:hover { color: var(--muted) !important; text-decoration: none; }
+.copyright img { display: block; }
 
 /* ---------- buttons ---------- */
 .button {

@@ -41,7 +41,7 @@ The database, the cloned workspaces and the CLI logins live in Docker volumes, s
 
 The `worker` container mounts `~/.ssh` read-only, so it clones and pushes with your SSH keys. Check that `ssh -T git@github.com` works on the host first. If you use HTTPS remotes, add a Git token in **Settings → Git**.
 
-The prebuilt image is x86-64. On Apple Silicon it runs under Docker's emulation; for native speed, build from source:
+The prebuilt image runs natively on x86-64 and ARM (including Apple Silicon). To build it from source instead:
 
 ```bash
 git clone https://github.com/orangeballdev/ai-task-manager.git

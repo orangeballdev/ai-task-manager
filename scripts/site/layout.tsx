@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element, @next/next/no-head-element, @next/next/no-page-custom-font -- static HTML generator, not a Next.js page */
 // The page shell shared by the marketing page and the docs: head, top bar, footer.
 import type { ReactNode } from "react";
-import { GITHUB_URL, PRODUCT_NAME } from "./site-config";
+import { GITHUB_URL, OWNER_NAME, OWNER_URL, PRODUCT_NAME } from "./site-config";
 
 export function Layout({
   title,
@@ -53,7 +53,12 @@ export function Layout({
         {children}
         <footer className="footer">
           <div className="footer-inner">
-            <span>{PRODUCT_NAME} · MIT licensed · self-hosted</span>
+            <a className="copyright" href={OWNER_URL} target="_blank" rel="noopener noreferrer">
+              <img src={`${prefix}orangeball.svg`} alt="" width={20} height={20} />
+              <span>
+                © {new Date().getFullYear()} {OWNER_NAME} · {PRODUCT_NAME} is MIT licensed
+              </span>
+            </a>
             <span>
               <a href={`${prefix}docs/`}>Docs</a> · <a href={GITHUB_URL}>GitHub</a>
             </span>
