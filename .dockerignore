@@ -12,3 +12,5 @@ data
 *.db-journal
 tsconfig.tsbuildinfo
 .claude
+.next-demo
+site

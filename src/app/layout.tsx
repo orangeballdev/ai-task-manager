@@ -21,6 +21,7 @@ import { WebAnalytics } from "@/components/WebAnalytics";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { getCurrentSession } from "@/lib/auth/session";
 import { authRequired } from "@/lib/auth/http";
+import { PUBLIC_DOCS_URL } from "@/lib/public-site";
 import { USER_MONITORING_KEYS, resolveUserMonitoring } from "@/lib/user-monitoring";
 
 const spaceGrotesk = Space_Grotesk({
@@ -114,7 +115,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <Link href="/repositories" className="hover:text-foreground transition-colors hidden md:block shrink-0">Repositories</Link>
             <Link href="/teams" className="hover:text-foreground transition-colors hidden md:block shrink-0">Teams</Link>
             <Link href="/webhooks" className="hover:text-foreground transition-colors hidden md:block shrink-0">Webhooks</Link>
-            <Link href="/docs" className="hover:text-foreground transition-colors hidden md:block shrink-0">Docs</Link>
+            <a href={PUBLIC_DOCS_URL} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors hidden md:block shrink-0">Docs</a>
             <Link href="/tasks/new" className={buttonVariants({ size: "sm" }) + " shrink-0 whitespace-nowrap"}>+ New Task</Link>
             <div className="ml-auto flex items-center gap-3 sm:gap-4 shrink-0">
               <NavSearch />

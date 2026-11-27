@@ -28,6 +28,10 @@ on:
     paths-ignore:
       - "charts/**"
       - "deploy/**"
+      # The public website is built and hosted by pages.yml.
+      - "site/**"
+      - "scripts/site/**"
+      - "scripts/demo/**"
   # Lets you build by hand: Actions -> Run workflow, or `gh workflow run images.yml`.
   workflow_dispatch:
 

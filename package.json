@@ -10,6 +10,10 @@
     "lint": "eslint",
     "worker": "tsx src/worker/index.ts",
     "integrations": "tsx src/integrations/index.ts",
+    "demo:seed": "tsx scripts/demo/seed.ts",
+    "demo:screenshots": "tsx scripts/demo/screenshots.ts",
+    "site:build": "tsx scripts/site/build.tsx",
+    "site:preview": "npm run site:build && npx serve site/dist",
     "test": "tsx --test src/lib/__tests__/hail-mary.test.ts src/lib/__tests__/output-parser.test.ts src/lib/__tests__/priority.test.ts src/lib/__tests__/effort.test.ts src/lib/__tests__/max-runs.test.ts src/lib/__tests__/kanban-column.test.ts src/lib/__tests__/resume.test.ts src/lib/__tests__/git.test.ts src/lib/__tests__/delete-lock.test.ts src/lib/__tests__/cleanup.test.ts src/lib/__tests__/task-retention.test.ts src/lib/__tests__/health-check.test.ts src/lib/__tests__/provider-throttle.test.ts src/lib/__tests__/smart-provider.test.ts src/lib/__tests__/usage-cap.test.ts src/lib/__tests__/email-inbound.test.ts src/lib/__tests__/repos.test.ts src/lib/__tests__/restart-signal.test.ts src/lib/__tests__/repo-concurrency.test.ts src/lib/__tests__/teams.test.ts src/lib/__tests__/verification-state.test.ts src/lib/__tests__/slack-proposal.test.ts src/lib/__tests__/slack-provider.test.ts src/lib/__tests__/codex-exec.test.ts src/lib/__tests__/cli-credentials.test.ts src/lib/__tests__/api-v1-files.test.ts src/lib/__tests__/otel-config.test.ts src/lib/__tests__/auth-failure.test.ts src/lib/__tests__/agent-tools.test.ts src/lib/__tests__/anthropic-reply.test.ts src/lib/__tests__/task-message-mode.test.ts src/lib/__tests__/pr-decision.test.ts src/lib/__tests__/decompose.test.ts src/lib/__tests__/pasted-images.test.ts src/lib/__tests__/attachments.test.ts src/lib/__tests__/subtasks.test.ts src/lib/__tests__/mcp-protocol.test.ts src/lib/__tests__/mcp-task-update.test.ts src/lib/__tests__/mcp-servers.test.ts src/lib/__tests__/output-type.test.ts src/lib/__tests__/llm-gateway.test.ts src/lib/__tests__/docs-content.test.ts src/lib/__tests__/docs-search.test.ts src/lib/__tests__/api-key-provider.test.ts src/lib/__tests__/mcp-oauth.test.ts src/lib/__tests__/gen-ai-telemetry.test.ts src/lib/__tests__/llm-usage-context.test.ts src/lib/__tests__/tool-spans.test.ts src/lib/__tests__/tool-error.test.ts src/lib/__tests__/tool-arguments.test.ts src/lib/__tests__/team-progress.test.ts src/lib/__tests__/auth-policy.test.ts src/lib/__tests__/token-spend.test.ts src/lib/__tests__/changes-summary.test.ts src/lib/__tests__/provider-auth-telemetry.test.ts src/lib/__tests__/claude-login.test.ts src/lib/__tests__/gateway-analytics.test.ts src/lib/__tests__/gateway-pause.test.ts src/lib/__tests__/review-only.test.ts src/lib/__tests__/user-monitoring.test.ts src/lib/__tests__/email-transport.test.ts src/lib/__tests__/settings-nav.test.ts",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
@@ -93,6 +97,7 @@
     "concurrently": "^9.2.1",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.4.6",
+    "playwright": "^1.65.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3"
   },

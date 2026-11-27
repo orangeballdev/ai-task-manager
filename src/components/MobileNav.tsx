@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
+import { PUBLIC_DOCS_URL } from "@/lib/public-site";
 
 interface MobileNavProps {
   taskBoardEnabled?: boolean;
@@ -89,13 +90,15 @@ export function MobileNav({ taskBoardEnabled = true }: MobileNavProps) {
               >
                 Webhooks
               </Link>
-              <Link
-                href="/docs"
+              <a
+                href={PUBLIC_DOCS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 onClick={() => setOpen(false)}
                 className="px-3 py-2 rounded-md hover:bg-muted text-sm transition-colors"
               >
                 Docs
-              </Link>
+              </a>
             </nav>
           </div>
         </>

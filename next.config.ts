@@ -3,6 +3,9 @@ import path from "path";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Lets a second dev server run beside the usual one (Next 16 locks one `next dev` per
+  // dist dir): scripts/demo/screenshots.ts sets it to `.next-demo`. Unset everywhere else.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   allowedDevOrigins: ["192.168.1.*", "localhost", "127.0.0.1"],
   // OpenTelemetry (src/lib/otel.ts) is loaded from node_modules at runtime rather
   // than bundled, so instrumentation.ts and the route handlers share one copy of
