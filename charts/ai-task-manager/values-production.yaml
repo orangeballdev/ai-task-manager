@@ -6,7 +6,7 @@
 # To roll back, set it to an older sha-<short sha> tag that is still in GHCR
 # (only the three newest are kept).
 image:
-  tag: sha-1076822
+  tag: sha-dba5117
 imagePullSecrets:
   - name: ghcr-pull
 # No Slack / inbound email on this cluster.
