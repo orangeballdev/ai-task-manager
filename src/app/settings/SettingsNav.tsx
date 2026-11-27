@@ -1,45 +1,67 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { SETTINGS_GROUPS, findSettingsPage } from "./settings-sections";
 
-const tabs = [
-  { href: "/settings/general", label: "General" },
-  { href: "/settings/layout", label: "Layout" },
-  { href: "/settings/ai", label: "AI" },
-  { href: "/settings/git", label: "Git" },
-  { href: "/settings/tools", label: "Agent Tools" },
-  { href: "/settings/mcp-servers", label: "MCP Servers" },
-  { href: "/settings/notifications", label: "Notifications" },
-  { href: "/settings/integrations", label: "Integrations" },
-  { href: "/settings/observability", label: "Observability" },
-  { href: "/settings/api", label: "API" },
-  { href: "/settings/mcp", label: "MCP" },
-  { href: "/settings/data", label: "Data" },
-  { href: "/settings/account", label: "Account" },
-  { href: "/settings/security", label: "Security" },
-  { href: "/settings/admin", label: "Admin" },
-];
-
+// Grouped settings navigation: a sticky sidebar on wide screens, a single
+// grouped <select> on narrow ones (instead of a long horizontally-scrolling
+// tab strip).
 export default function SettingsNav() {
   const pathname = usePathname();
+  const router = useRouter();
+  const current = findSettingsPage(pathname);
+
   return (
-    <nav className="flex gap-1 border-b border-border overflow-x-auto scrollbar-none">
-      {tabs.map(({ href, label }) => {
-        const active = pathname === href;
-        return (
-          <Link
-            key={href}
-            href={href}
-            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px shrink-0 ${
-              active
-                ? "border-foreground text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {label}
-          </Link>
-        );
-      })}
-    </nav>
+    <>
+      <div className="md:hidden">
+        <label htmlFor="settings-page" className="sr-only">
+          Settings page
+        </label>
+        <select
+          id="settings-page"
+          value={current?.href ?? ""}
+          onChange={(e) => router.push(e.target.value)}
+          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+        >
+          {!current && <option value="">Choose a page…</option>}
+          {SETTINGS_GROUPS.map((group) => (
+            <optgroup key={group.label} label={group.label}>
+              {group.pages.map((page) => (
+                <option key={page.href} value={page.href}>
+                  {page.label}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </div>
+
+      <nav aria-label="Settings" className="hidden md:flex md:flex-col md:gap-5 md:sticky md:top-20">
+        {SETTINGS_GROUPS.map((group) => (
+          <div key={group.label} className="flex flex-col gap-0.5">
+            <span className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+              {group.label}
+            </span>
+            {group.pages.map((page) => {
+              const active = current?.href === page.href;
+              return (
+                <Link
+                  key={page.href}
+                  href={page.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                    active
+                      ? "bg-muted font-medium text-foreground"
+                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  }`}
+                >
+                  {page.label}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
+      </nav>
+    </>
   );
 }

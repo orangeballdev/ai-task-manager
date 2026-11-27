@@ -103,37 +103,37 @@ export const SETTINGS_INDEX: SettingsIndexEntry[] = [
     keywords: ["chat", "assistant", "chatbot", "questions"],
   },
 
-  // ---- Layout ----
+  // ---- General → Appearance (formerly Layout) ----
   {
     title: "Card arrangement",
-    href: "/settings/layout",
-    section: "Layout",
+    href: "/settings/general",
+    section: "General",
     anchor: "card-arrangement",
-    description: "Reorder the cards shown on task and dashboard views.",
-    keywords: ["layout", "arrange", "order", "cards", "reorder"],
+    description: "Show task cards as a single-column list or a multi-column grid.",
+    keywords: ["layout", "appearance", "arrange", "list", "grid", "cards", "view"],
   },
   {
     title: "Card density",
-    href: "/settings/layout",
-    section: "Layout",
+    href: "/settings/general",
+    section: "General",
     anchor: "card-density",
     description: "Choose a compact or comfortable spacing for cards.",
-    keywords: ["density", "compact", "spacing", "comfortable"],
+    keywords: ["layout", "appearance", "density", "compact", "spacing", "comfortable"],
   },
   {
     title: "Files view",
-    href: "/settings/layout",
-    section: "Layout",
+    href: "/settings/general",
+    section: "General",
     anchor: "files-view",
-    description: "Configure how changed files are displayed.",
-    keywords: ["files", "view", "diff", "changes"],
+    description: "Browse task workspace files as a detailed list or as large icons.",
+    keywords: ["layout", "appearance", "files", "view", "icons", "finder"],
   },
 
   // ---- AI ----
   {
     title: "Auto-Switch Provider",
     href: "/settings/ai",
-    section: "AI",
+    section: "AI Providers",
     anchor: "auto-switch-provider",
     description: "Fall back to another provider when one is rate-limited.",
     keywords: ["provider", "fallback", "switch", "rate limit"],
@@ -141,7 +141,7 @@ export const SETTINGS_INDEX: SettingsIndexEntry[] = [
   {
     title: "Smart Provider Picker",
     href: "/settings/ai",
-    section: "AI",
+    section: "AI Providers",
     anchor: "smart-provider-picker",
     description: "Automatically choose the best available provider at run time.",
     keywords: ["smart", "provider", "picker", "auto"],
@@ -149,7 +149,7 @@ export const SETTINGS_INDEX: SettingsIndexEntry[] = [
   {
     title: "Health Checks",
     href: "/settings/ai",
-    section: "AI",
+    section: "AI Providers",
     anchor: "health-checks",
     description: "Periodically verify provider credentials and availability.",
     keywords: ["health", "checks", "credentials", "status"],
@@ -157,7 +157,7 @@ export const SETTINGS_INDEX: SettingsIndexEntry[] = [
   {
     title: "Max Output Tokens (CLI)",
     href: "/settings/ai",
-    section: "AI",
+    section: "AI Providers",
     anchor: "max-output-tokens",
     description: "Cap the maximum output tokens for CLI provider runs.",
     keywords: ["tokens", "output", "max tokens", "cli", "limit"],
@@ -165,7 +165,7 @@ export const SETTINGS_INDEX: SettingsIndexEntry[] = [
   {
     title: "Agent Delegation",
     href: "/settings/ai",
-    section: "AI",
+    section: "AI Providers",
     anchor: "agent-delegation",
     description: "Let the agent delegate to subagents and pick the best model per agent.",
     keywords: ["agent", "delegation", "subagent", "subagents", "model", "opus", "sonnet", "haiku", "task tool", "per agent model"],
@@ -173,7 +173,7 @@ export const SETTINGS_INDEX: SettingsIndexEntry[] = [
   {
     title: "Global Agent Instructions",
     href: "/settings/ai",
-    section: "AI",
+    section: "AI Providers",
     anchor: "global-agent-instructions",
     description: "Instructions injected into every task's prompt.",
     keywords: ["instructions", "agent", "system prompt", "global"],
@@ -181,7 +181,7 @@ export const SETTINGS_INDEX: SettingsIndexEntry[] = [
   {
     title: "Prompt Builder & Chat Assistant",
     href: "/settings/ai",
-    section: "AI",
+    section: "AI Providers",
     anchor: "prompt-builder",
     description: "Configure how prompts and the chat assistant are built.",
     keywords: ["prompt", "builder", "chat", "assistant"],
@@ -189,7 +189,7 @@ export const SETTINGS_INDEX: SettingsIndexEntry[] = [
   {
     title: "AI Providers",
     href: "/settings/ai",
-    section: "AI",
+    section: "AI Providers",
     anchor: "ai-providers",
     description: "Manage API keys, models, and configured AI providers.",
     keywords: ["providers", "api key", "model", "anthropic", "openai"],
@@ -197,7 +197,7 @@ export const SETTINGS_INDEX: SettingsIndexEntry[] = [
   {
     title: "Default Effort",
     href: "/settings/ai",
-    section: "AI",
+    section: "AI Providers",
     anchor: "default-effort",
     description: "Thinking effort level new tasks are pre-filled with.",
     keywords: ["effort", "thinking", "reasoning", "default", "low", "medium", "high", "xhigh", "max"],
@@ -370,7 +370,7 @@ export const SETTINGS_INDEX: SettingsIndexEntry[] = [
   {
     title: "MCP Access Tokens",
     href: "/settings/mcp",
-    section: "MCP",
+    section: "MCP Access",
     anchor: "mcp-tokens",
     description: "Create read-only or read & write tokens that let MCP clients (Claude Code, Claude Desktop, Cursor) work with tasks.",
     keywords: ["mcp", "model context protocol", "token", "claude code", "claude desktop", "cursor", "vs code", "assistant", "connector", "read only", "write", "access"],
@@ -478,14 +478,14 @@ export const SETTINGS_INDEX: SettingsIndexEntry[] = [
     keywords: ["audit", "login history", "sign in log", "failed logins", "security log"],
   },
 
-  // ---- Admin ----
+  // ---- General → Server (formerly Admin) ----
   {
     title: "App Host",
-    href: "/settings/admin",
-    section: "Admin",
+    href: "/settings/general",
+    section: "General",
     anchor: "app-host",
-    description: "The public host/URL the app is served from.",
-    keywords: ["host", "url", "domain", "base url"],
+    description: "The server address used in links in email and Slack notifications.",
+    keywords: ["host", "url", "domain", "base url", "admin", "server", "links"],
   },
 ];
 

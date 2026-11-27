@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { EmailDeliveryCard } from "@/components/settings/EmailDeliveryCard";
+import { EmailDeliveryCard } from "@/app/settings/_components/EmailDeliveryCard";
 
 interface NotificationSettings {
   notification_email_enabled: string;
@@ -122,18 +122,6 @@ export default function NotificationsSettingsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">About Notifications</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Notifications alert you when your tasks complete or fail. Configure how and where
-            you want to be notified so you can stay informed without watching the dashboard.
-          </p>
-        </CardContent>
-      </Card>
-
       <EmailDeliveryCard />
 
       <Card>
