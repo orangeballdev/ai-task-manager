@@ -19,6 +19,7 @@ import { HomeLogoLink } from "@/components/HomeLogoLink";
 import { NavigationGuard } from "@/components/NavigationGuard";
 import { WebAnalytics } from "@/components/WebAnalytics";
 import { UserMenu } from "@/components/auth/UserMenu";
+import { AppFooter } from "@/components/AppFooter";
 import { getCurrentSession } from "@/lib/auth/session";
 import { authRequired } from "@/lib/auth/http";
 import { PUBLIC_DOCS_URL } from "@/lib/public-site";
@@ -86,6 +87,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <html lang="en" className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} antialiased dark`}>
         <body className="min-h-screen flex flex-col bg-background text-foreground">
           <main className="flex-1 p-3 sm:p-6">{children}</main>
+          <AppFooter />
           <Toaster />
         </body>
       </html>
@@ -142,6 +144,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
         )}
         <main className="flex-1 p-3 sm:p-6">{children}</main>
+        <AppFooter />
         <Toaster />
         <ConfirmDialogHost />
       </body>
