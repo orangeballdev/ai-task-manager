@@ -21,11 +21,9 @@ name: Image - build and push to GHCR
 # those. Each platform's layer cache lives in the `ai-task-manager-buildcache`
 # package under its own tag.
 #
-# Builds from main are then deployed: the job commits the new sha tag to
-# charts/ai-task-manager/values-production.yaml on main, and the Argo CD
-# Application (deploy/argocd/ai-task-manager.yaml) syncs it. That commit
-# doesn't start another build: pushes made with GITHUB_TOKEN never trigger
-# workflows, and charts/** is ignored anyway.
+# Builds from main are then deployed: the job commits the new sha tag to the
+# private GitOps repo (orangeballdev/obistack-gitops), which Argo CD watches.
+# Nothing is committed back to this repo.
 
 on:
   push:
@@ -121,33 +119,32 @@ jobs:
           docker buildx imagetools inspect "${image}:${sha}"
 
       # Point Argo CD at the image just pushed. Only for main, so a manual
-      # build of another branch never deploys. Retries on a push race with a
-      # commit that landed during the build.
-      #
-      # main is protected by the "Protect main" ruleset (changes by pull request
-      # only), which the Actions token can't bypass. The push therefore goes over
-      # SSH with the DEPLOY_KEY secret: a write deploy key for this repo, which the
-      # ruleset lets through. To rotate it, add a new write deploy key and replace
-      # the secret.
+      # build of another branch never deploys. The cluster's config lives in the
+      # private GitOps repo orangeballdev/obistack-gitops: this commits the new tag
+      # to values/ai-task-manager/production.yaml there, and Argo CD rolls it out.
+      # GITOPS_DEPLOY_KEY is a write deploy key for that repo only. Without it (a
+      # fork, say) the image is still published and the deploy is skipped.
       - name: Deploy to Argo CD
         if: github.ref == 'refs/heads/main'
         env:
-          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+          GITOPS_DEPLOY_KEY: ${{ secrets.GITOPS_DEPLOY_KEY }}
         run: |
           set -euo pipefail
-          if [ -z "${DEPLOY_KEY}" ]; then
-            echo "The DEPLOY_KEY secret is missing, so the tag bump can't be pushed to protected main" >&2
-            exit 1
+          if [ -z "${GITOPS_DEPLOY_KEY}" ]; then
+            echo "::notice::GITOPS_DEPLOY_KEY is not set, skipping the deploy"
+            exit 0
           fi
-          key="${RUNNER_TEMP}/deploy_key"
-          printf '%s\n' "${DEPLOY_KEY}" > "$key"
+          key="${RUNNER_TEMP}/gitops_key"
+          printf '%s\n' "${GITOPS_DEPLOY_KEY}" > "$key"
           chmod 600 "$key"
           export GIT_SSH_COMMAND="ssh -i ${key} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
-          git remote set-url origin "git@github.com:${GITHUB_REPOSITORY}.git"
           tag="sha-${GITHUB_SHA::7}"
-          values=charts/ai-task-manager/values-production.yaml
+          values=values/ai-task-manager/production.yaml
+          git clone --quiet --depth 1 git@github.com:orangeballdev/obistack-gitops.git "${RUNNER_TEMP}/gitops"
+          cd "${RUNNER_TEMP}/gitops"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Retries on a push race with another app's deploy landing meanwhile.
           for attempt in 1 2 3; do
             git fetch --quiet origin main
             git reset --quiet --hard origin/main
@@ -156,7 +153,7 @@ jobs:
               echo "${values} already at ${tag}"
               exit 0
             fi
-            git commit --quiet -am "Deploy ${tag} [skip ci]"
+            git commit --quiet -am "Deploy ai-task-manager ${tag}" -m "From ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
             if git push --quiet origin HEAD:main; then
               echo "Deployed ${tag}"
               exit 0

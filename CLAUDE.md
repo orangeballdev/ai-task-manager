@@ -51,7 +51,7 @@ This is a task queue that runs Claude agents against Git repos. The system has t
 
 ### Branches & releases
 
-`main` is protected by the "Protect main" ruleset: no force-pushes or deletion, and changes land only through pull requests (work on `develop`, open a PR to `main`). Every push to `main` builds the multi-arch image (`images.yml`: amd64 and arm64 on native runners, joined into `latest` + `sha-<sha>`) and deploys it via Argo CD; the workflow pushes the tag bump with the `DEPLOY_KEY` secret (a write deploy key the ruleset lets through), because the Actions token can't bypass rulesets.
+`main` is protected by the "Protect main" ruleset: no force-pushes or deletion, and changes land only through pull requests (work on `develop`, open a PR to `main`). Every push to `main` builds the multi-arch image (`images.yml`: amd64 and arm64 on native runners, joined into `latest` + `sha-<sha>`). The maintainers' own deployment is not in this repo: the workflow commits the new tag to the private GitOps repo `orangeballdev/obistack-gitops` (via the `GITOPS_DEPLOY_KEY` secret, a write deploy key for that repo only), which Argo CD watches. `charts/ai-task-manager` is the generic Helm chart; cluster-specific values belong in the GitOps repo, not here.
 
 ### Public website (`site/`)
 
